@@ -1,0 +1,149 @@
+services:
+  kafka1: # Nome do serviço Kafka (Nó 1)
+    image: apache/kafka:latest # Imagem oficial do Kafka
+    hostname: kafka1
+    container_name: kafka1 # Nome do container
+    ports: # Mapeamento de portas
+      - "29092:29092"      # Porta externa para comunicação com clientes Kafka
+    environment:  # Variáveis de ambiente para configuração do Kafka
+      # ID do cluster (deve ser o mesmo para todos os brokers no cluster)
+      CLUSTER_ID: ${KAFKA_CLUSTER_ID}          
+      KAFKA_NODE_ID: 1                          # Identificador único do nó Kafka
+      KAFKA_PROCESS_ROLES: broker,controller    # Define os papéis do nó Kafka (modo KRaft: broker e controller)
+      
+      # Controller interno (Lista com todos os controllers do cluster para formar o quorum)
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1:9093,2@kafka2:9093,3@kafka3:9093
+      
+      # Listeners (interfaces onde o Kafka vai escutar)
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:19092,CONTROLLER://0.0.0.0:9093,EXTERNAL://0.0.0.0:29092
+      # Listeners que o Kafka anunciará para os clientes se conectarem
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka1:19092,EXTERNAL://localhost:29092
+      
+      # Protocolos dos listeners 
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      
+      # Listener usado pelos brokers para comunicação interna
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      
+      # Listener usado pelo controller
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      
+      # Configurações de replicação para o cluster
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3         
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2            # Número mínimo de réplicas in-sync
+      
+      # Criar tópicos automaticamente (desativado para controle rigoroso)
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"          
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0         
+      
+      # Diretório dos logs de dados
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes: # Montagem de volume para persistência de dados do Kafka
+      - kafka1_data:/var/lib/kafka/data
+    networks:
+      - fabrinteligente
+
+  kafka2: # Nome do serviço Kafka (Nó 2)
+    image: apache/kafka:latest # Imagem oficial do Kafka
+    hostname: kafka2
+    container_name: kafka2 # Nome do container
+    ports: # Mapeamento de portas
+      - "29093:29093"      # Porta externa para comunicação com clientes Kafka
+    environment:  # Variáveis de ambiente para configuração do Kafka
+      # ID do cluster (deve ser o mesmo para todos os brokers no cluster)
+      CLUSTER_ID: ${KAFKA_CLUSTER_ID}          
+      KAFKA_NODE_ID: 2                          # Identificador único do nó Kafka
+      KAFKA_PROCESS_ROLES: broker,controller    # Define os papéis do nó Kafka (modo KRaft: broker e controller)
+      
+      # Controller interno (Lista com todos os controllers do cluster para formar o quorum)
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1:9093,2@kafka2:9093,3@kafka3:9093
+      
+      # Listeners (interfaces onde o Kafka vai escutar)
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:19092,CONTROLLER://0.0.0.0:9093,EXTERNAL://0.0.0.0:29093
+      # Listeners que o Kafka anunciará para os clientes se conectarem
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka2:19092,EXTERNAL://localhost:29093
+      
+      # Protocolos dos listeners 
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      
+      # Listener usado pelos brokers para comunicação interna
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      
+      # Listener usado pelo controller
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      
+      # Configurações de replicação para o cluster
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3         
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2            # Número mínimo de réplicas in-sync
+      
+      # Criar tópicos automaticamente (desativado para controle rigoroso)
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"          
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0         
+      
+      # Diretório dos logs de dados
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes: # Montagem de volume para persistência de dados do Kafka
+      - kafka2_data:/var/lib/kafka/data
+    networks:
+      - fabrinteligente
+
+  kafka3: # Nome do serviço Kafka (Nó 3)
+    image: apache/kafka:latest # Imagem oficial do Kafka
+    hostname: kafka3
+    container_name: kafka3 # Nome do container
+    ports: # Mapeamento de portas
+      - "29094:29094"      # Porta externa para comunicação com clientes Kafka
+    environment:  # Variáveis de ambiente para configuração do Kafka
+      # ID do cluster (deve ser o mesmo para todos os brokers no cluster)
+      CLUSTER_ID: ${KAFKA_CLUSTER_ID}          
+      KAFKA_NODE_ID: 3                          # Identificador único do nó Kafka
+      KAFKA_PROCESS_ROLES: broker,controller    # Define os papéis do nó Kafka (modo KRaft: broker e controller)
+      
+      # Controller interno (Lista com todos os controllers do cluster para formar o quorum)
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1:9093,2@kafka2:9093,3@kafka3:9093
+      
+      # Listeners (interfaces onde o Kafka vai escutar)
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:19092,CONTROLLER://0.0.0.0:9093,EXTERNAL://0.0.0.0:29094
+      # Listeners que o Kafka anunciará para os clientes se conectarem
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka3:19092,EXTERNAL://localhost:29094
+      
+      # Protocolos dos listeners 
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      
+      # Listener usado pelos brokers para comunicação interna
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      
+      # Listener usado pelo controller
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      
+      # Configurações de replicação para o cluster
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3         
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2            # Número mínimo de réplicas in-sync
+      
+      # Criar tópicos automaticamente (desativado para controle rigoroso)
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"          
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0         
+      
+      # Diretório dos logs de dados
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes: # Montagem de volume para persistência de dados do Kafka
+      - kafka3_data:/var/lib/kafka/data
+    networks:
+      - fabrinteligente
+
+  # sensor:
+  #   build: ./produtor
+  # processador:
+  #   build: ./consumidor
+
+networks:
+  fabrinteligente:
+    driver: bridge
+
+volumes:
+  kafka1_data:
+  kafka2_data:
+  kafka3_data:
