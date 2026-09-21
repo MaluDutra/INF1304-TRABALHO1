@@ -51,7 +51,7 @@ def gerar_leitura(sensor_id: str) -> dict:
     """
     leitura = {
         "sensor_id": sensor_id,
-        "setor": random.choice(SETOR),
+        "setor": SETOR,
         "timestamp": time.time(),
     }
 
