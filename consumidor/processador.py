@@ -118,40 +118,16 @@ class ConsumidorSensor:
         # Verifica cada parâmetro contra seu limite
         for parametro, limite in limites.items():
             if dados_mensagem.get(parametro) > limite:
-                return self._criar_alerta(
-                    dados_mensagem.get("sensor_id"),
-                    dados_mensagem.get("setor"),
-                    dados_mensagem.get("timestamp"),
-                    parametro,
-                    dados_mensagem.get(parametro),
-                    limite,
+                valor = dados_mensagem.get(parametro)
+                sensor_id = dados_mensagem.get("sensor_id")
+                setor = dados_mensagem.get("setor")
+                timestamp = dados_mensagem.get("timestamp")
+                return (
+                    f"Sensor {sensor_id} no setor {setor} excedeu o limite "
+                    f"de {parametro}. Valor: {valor}, Limite: {limite}, "
+                    f"Timestamp: {timestamp}"
                 )
         return None
-
-    def _criar_alerta(
-        self,
-        sensor_id: str,
-        setor: str,
-        timestamp: str,
-        parametro: str,
-        valor: float,
-        limite: float,
-    ) -> str:
-        """Cria um alerta para o parâmetro que excedeu o limite.
-
-        Args:
-            sensor_id: Identificador do sensor.
-            setor: Setor ao qual o sensor pertence.
-            timestamp: Timestamp da mensagem.
-            parametro: Nome do parâmetro que excedeu o limite.
-            valor: Valor atual do parâmetro.
-            limite: Limite de perigo para o parâmetro.
-        """
-        self.logger.warning(
-            f"Sensor {sensor_id} no setor {setor} "
-            f"excedeu o limite de {parametro}. "
-            f"Valor: {valor}, Limite: {limite}, Timestamp: {timestamp}"
-        )
 
     def _limites_perigosos(self) -> dict:
         """Retorna os limites de perigo para cada parâmetro do sensor.
