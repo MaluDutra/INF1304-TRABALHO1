@@ -281,6 +281,10 @@ services:
       KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP} # Brokers (listener interno da rede Docker)
       TOPICO_SENSORES: ${TOPICO_SENSORES} # Tópico de sensores que o consumidor vai escutar
       GRUPO_CONSUMIDORES: ${GRUPO_CONSUMIDORES} # Grupo de consumidores para dividir as partições do tópico
+      # Tempos do protocolo de grupo: o session timeout define quanto demora o failover
+      SESSION_TIMEOUT_MS: ${SESSION_TIMEOUT_MS}
+      HEARTBEAT_INTERVAL_MS: ${HEARTBEAT_INTERVAL_MS}
+      MAX_POLL_INTERVAL_MS: ${MAX_POLL_INTERVAL_MS}
       # Limites de perigo usados pelo processador para gerar alertas
       TEMP_LIMITE: ${TEMP_LIMITE}
       VIBRACAO_LIMITE: ${VIBRACAO_LIMITE}

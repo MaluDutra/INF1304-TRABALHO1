@@ -52,8 +52,11 @@ class ConsumidorSensor:
             "auto.offset.reset": "earliest",
             "enable.auto.commit": True,
             "auto.commit.interval.ms": 5000,
-            "session.timeout.ms": 10000,
-            "heartbeat.interval.ms": 3000,
+            # Tempo sem heartbeat até o coordenador considerar o consumidor morto
+            # e disparar o rebalanço (define a velocidade do failover)
+            "session.timeout.ms": int(os.getenv("SESSION_TIMEOUT_MS", "10000")),
+            "heartbeat.interval.ms": int(os.getenv("HEARTBEAT_INTERVAL_MS", "3000")),
+            "max.poll.interval.ms": int(os.getenv("MAX_POLL_INTERVAL_MS", "300000")),
         }
 
         try:
