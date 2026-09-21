@@ -1,14 +1,15 @@
+"""Processador de dados de sensores Kafka."""
+
 import asyncio
 import logging
 import os
-import random
 import time
 
 from confluent_kafka import Consumer
 
 
 class ConsumidorSensor:
-    """Consome dados de sensores do Kafka
+    """Consome dados de sensores do Kafka.
 
     Args:
         id_consumidor: Identificador desta instância do consumidor.
@@ -17,7 +18,17 @@ class ConsumidorSensor:
         grupo_consumidor: Grupo de consumidores usado para dividir as partições.
     """
 
-    def __init__(self, id_consumidor, brokers_kafka, topico_sensor, grupo_consumidor):
+    def __init__(
+        self, id_consumidor: str, brokers_kafka: str, topico_sensor: str, grupo_consumidor: str
+    ) -> None:
+        """Inicializa o consumidor Kafka de dados de sensores.
+
+        Args:
+            id_consumidor: Identificador desta instância do consumidor.
+            brokers_kafka: Brokers Kafka, separados por vírgula.
+            topico_sensor: Tópico de onde os dados dos sensores são lidos.
+            grupo_consumidor: Grupo de consumidores usado para dividir as partições.
+        """
         self.id_consumidor = id_consumidor
         self.brokers_kafka = brokers_kafka
         self.topico_sensor = topico_sensor
@@ -45,20 +56,18 @@ class ConsumidorSensor:
         # Assinatura do tópico de sensores
         self.consumidor.subscribe([self.topico_sensor])
         self.logger.info(f"Assinando tópico: {self.topico_sensor}")
-        
 
-    def _configurar_logger(self):
-        # Configuração do logger
+    def _configurar_logger(self) -> logging.Logger:
+        """Configuração do logger."""
         # O nível de log pode ser configurado via variável de ambiente LOG_LEVEL
         log_level = os.getenv("LOG_LEVEL", "INFO").upper()
         logging.basicConfig(
             level=getattr(logging, log_level, logging.INFO),
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         )
-        logger = logging.getLogger(self.id_consumidor)
-        return logger
+        return logging.getLogger(self.id_consumidor)
 
-    async def run(self):
+    async def run(self) -> None:
         """Escuta e processa mensagens do tópico de sensores.
 
         Executa até ser interrompido.
@@ -66,7 +75,7 @@ class ConsumidorSensor:
         # Consumo de mensagens do Kafka (implementação pendente)
         pass
 
-    def stop(self):
+    def stop(self) -> None:
         """Encerra o consumidor.
 
         Deve liberar as conexões com o Kafka de forma limpa.
@@ -75,15 +84,14 @@ class ConsumidorSensor:
         pass
 
 
-async def main():
+async def main() -> None:
     """Lê a configuração do ambiente e executa o consumidor.
 
     Variáveis: CONSUMER_ID, KAFKA_BOOTSTRAP, TOPICO_SENSORES e
     GRUPO_CONSUMIDORES. Todas têm valor padrão.
     """
     # Lê a configuração do ambiente
-    random.seed(time.time())
-    id_consumidor = os.getenv("CONSUMER_ID", f"consumidor-{random.randint(1, 1000)}")
+    id_consumidor = os.getenv("CONSUMER_ID", f"consumidor-{int(time.time())}")
     brokers_kafka = os.getenv("KAFKA_BOOTSTRAP", "kafka1:19092,kafka2:19092,kafka3:19092")
     topico_sensor = os.getenv("TOPICO_SENSORES", "dados-sensores")
     grupo_consumidor = os.getenv("GRUPO_CONSUMIDORES", "processadores")
