@@ -74,14 +74,97 @@ class ConsumidorSensor:
         )
         return logging.getLogger(self.id_consumidor)
 
-    def processar_mensagem(self, dados_mensagem: dict) -> None:
+    def processar_mensagem(self, dados_mensagem: dict, mensagem: dict | None = None) -> None:
         """Processa a mensagem recebida do Kafka.
 
         Args:
             dados_mensagem: Dicionário contendo os dados da mensagem.
+            mensagem: Objeto de mensagem do Kafka para metadados (opcional).
         """
-        # Aqui você pode implementar a lógica de processamento dos dados do sensor
-        self.logger.info(f"Mensagem recebida: {dados_mensagem}")
+        sensor_id = dados_mensagem.get("sensor_id")
+        setor = dados_mensagem.get("setor")
+        timestamp = dados_mensagem.get("timestamp")
+        temperatura = dados_mensagem.get("temperatura")
+        vibracao = dados_mensagem.get("vibracao")
+        umidade = dados_mensagem.get("umidade")
+        consumo_energia = dados_mensagem.get("consumo_energia")
+
+        # Verifica se algum parâmetro excede os limites de perigo
+        alerta = self._detectar_perigo(dados_mensagem)
+        if alerta:
+            self.logger.warning(f"ALERTA: {alerta}")
+
+        # Logando os dados recebidos
+        particao_str = f"[particao {mensagem.partition()}]" if mensagem else ""
+        self.logger.info(
+            f"Mensagem recebida - Sensor: {sensor_id}, Setor: {setor}, "
+            f"Timestamp: {timestamp}, Temperatura: {temperatura}, "
+            f"Vibração: {vibracao}, Umidade: {umidade}, "
+            f"Consumo de Energia: {consumo_energia} {particao_str}"
+        )
+
+    def _detectar_perigo(self, dados_mensagem: dict) -> str | None:
+        """Detecta se algum parâmetro do sensor excede os limites de perigo.
+
+        Args:
+            sensor_id: Identificador do sensor.
+            dados_mensagem: Dicionário contendo os dados da mensagem.
+
+        Returns:
+            Mensagem de alerta se algum parâmetro exceder o limite, ou None caso contrário.
+        """
+        limites = self._limites_perigosos()
+
+        # Verifica cada parâmetro contra seu limite
+        for parametro, limite in limites.items():
+            if dados_mensagem.get(parametro) > limite:
+                return self._criar_alerta(
+                    dados_mensagem.get("sensor_id"),
+                    dados_mensagem.get("setor"),
+                    dados_mensagem.get("timestamp"),
+                    parametro,
+                    dados_mensagem.get(parametro),
+                    limite,
+                )
+        return None
+
+    def _criar_alerta(
+        self,
+        sensor_id: str,
+        setor: str,
+        timestamp: str,
+        parametro: str,
+        valor: float,
+        limite: float,
+    ) -> str:
+        """Cria um alerta para o parâmetro que excedeu o limite.
+
+        Args:
+            sensor_id: Identificador do sensor.
+            setor: Setor ao qual o sensor pertence.
+            timestamp: Timestamp da mensagem.
+            parametro: Nome do parâmetro que excedeu o limite.
+            valor: Valor atual do parâmetro.
+            limite: Limite de perigo para o parâmetro.
+        """
+        self.logger.warning(
+            f"Sensor {sensor_id} no setor {setor} "
+            f"excedeu o limite de {parametro}. "
+            f"Valor: {valor}, Limite: {limite}, Timestamp: {timestamp}"
+        )
+
+    def _limites_perigosos(self) -> dict:
+        """Retorna os limites de perigo para cada parâmetro do sensor.
+
+        Returns:
+            Dicionário com os limites de perigo para cada parâmetro.
+        """
+        return {
+            "temperatura": float(os.getenv("TEMP_MAX", "50.0")),
+            "vibracao": float(os.getenv("VIBRACAO_LIMITE", "10.0")),
+            "umidade": float(os.getenv("UMIDADE_LIMITE", "80.0")),
+            "consumo_energia": float(os.getenv("ENERGIA_LIMITE", "200.0")),
+        }
 
     async def run(self) -> None:
         """Escuta e processa mensagens do tópico de sensores.
@@ -111,7 +194,7 @@ class ConsumidorSensor:
                     dados_mensagem = json.loads(msg.value().decode("utf-8"))
 
                     # Processa a mensagem recebida
-                    self.processar_mensagem(dados_mensagem)
+                    self.processar_mensagem(dados_mensagem, msg)
 
                 except Exception as e:
                     self.logger.error(f"Erro ao processar mensagem: {e}")
