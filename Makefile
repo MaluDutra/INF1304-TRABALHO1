@@ -11,10 +11,12 @@ BROKERS = kafka1 kafka2 kafka3
 # Serviço único do consumidor no docker-compose.yml, escalado em réplicas (todas no mesmo grupo)
 CONSUMIDOR = consumidor
 NUM_CONSUMIDORES ?= 3
+# Broker derrubado por falha-broker (ex.: make falha-broker BROKER=kafka3)
+BROKER ?= kafka2
 
 .PHONY: help setup start stop restart clean status health logs topics esperar-kafka \
 	construir-consumidores iniciar-consumidores parar-consumidores reiniciar-consumidores \
-	logs-consumidores grupo-consumidores
+	logs-consumidores grupo-consumidores escalar falha-consumidor falha-broker
 
 # Alvo padrão
 help:
@@ -39,6 +41,11 @@ help:
 	@echo "  reiniciar-consumidores - Reconstrói e reinicia os consumidores"
 	@echo "  logs-consumidores      - Mostra os logs dos consumidores"
 	@echo "  grupo-consumidores     - Mostra as partições e o lag do grupo de consumidores"
+	@echo "  escalar N=<n>          - Altera o número de réplicas sem recriar as existentes"
+	@echo ""
+	@echo "Simulação de falhas:"
+	@echo "  falha-consumidor       - Derruba uma réplica do consumidor (rebalanço)"
+	@echo "  falha-broker           - Derruba um broker Kafka (BROKER=kafka2 por padrão)"
 
 # Verifica se o ambiente está configurado
 setup:
@@ -159,3 +166,25 @@ grupo-consumidores:
 		--bootstrap-server $(BROKER_INTERNO) \
 		--describe \
 		--group $(GRUPO_CONSUMIDORES)
+
+# Altera o número de réplicas sem recriar as existentes (ex.: make escalar N=5)
+# O --no-recreate mantém as réplicas vivas, então o log mostra só o rebalanço
+escalar:
+	@if [ -z "$(N)" ]; then echo "Erro: informe o número de réplicas (ex.: make escalar N=5)"; exit 1; fi
+	@echo "Escalando $(CONSUMIDOR) para $(N) réplicas..."
+	@docker compose up -d --no-recreate --scale $(CONSUMIDOR)=$(N) $(CONSUMIDOR)
+	@echo "Escala ajustada!"
+
+# Derruba uma réplica do consumidor para demonstrar o rebalanço
+falha-consumidor:
+	@alvo=$$(docker compose ps -q $(CONSUMIDOR) | head -1); \
+	if [ -z "$$alvo" ]; then echo "Erro: nenhuma réplica de $(CONSUMIDOR) em execução"; exit 1; fi; \
+	echo "Derrubando o consumidor $$(docker inspect -f '{{.Config.Hostname}}' $$alvo)..."; \
+	docker stop $$alvo >/dev/null; \
+	echo "Consumidor derrubado! Acompanhe com: make logs-consumidores"
+
+# Derruba um broker Kafka para demonstrar o failover (ex.: make falha-broker BROKER=kafka3)
+falha-broker:
+	@echo "Derrubando o broker $(BROKER)..."
+	@docker stop $(BROKER) >/dev/null
+	@echo "Broker derrubado! Verifique com: make health"

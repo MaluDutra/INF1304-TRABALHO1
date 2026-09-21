@@ -5,11 +5,11 @@ import json
 import logging
 import os
 import signal
-import time
+import socket
 from datetime import datetime
 from types import FrameType
 
-from confluent_kafka import Consumer
+from confluent_kafka import Consumer, TopicPartition
 
 
 class ConsumidorSensor:
@@ -67,7 +67,12 @@ class ConsumidorSensor:
             raise
 
         # Assinatura do tópico de sensores
-        self.consumidor.subscribe([self.topico_sensor])
+        self.consumidor.subscribe(
+            [self.topico_sensor],
+            on_assign=self.on_assign,
+            on_revoke=self.on_revoke,
+            on_lost=self.on_lost,
+        )
         self.logger.info(f"Assinando tópico: {self.topico_sensor}")
 
         # Configurar sinais de encerramento
@@ -83,6 +88,44 @@ class ConsumidorSensor:
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         )
         return logging.getLogger(self.id_consumidor)
+
+    def on_assign(self, consumidor: Consumer, particoes: list[TopicPartition]) -> None:
+        """Callback disparado quando o coordenador atribui partições a este consumidor.
+
+        Apenas registra o evento no log; a atribuição em si é feita pela biblioteca.
+
+        Args:
+            consumidor: Instância do consumidor Kafka que recebeu as partições.
+            particoes: Partições atribuídas a este consumidor.
+        """
+        ids = sorted(p.partition for p in particoes)
+        self.logger.info(
+            f"REBALANCO - partições ATRIBUÍDAS a {self.id_consumidor} "
+            f"(member.id={consumidor.memberid()}): {ids}"
+        )
+
+    def on_revoke(self, consumidor: Consumer, particoes: list[TopicPartition]) -> None:
+        """Callback disparado antes de este consumidor perder partições no rebalanço.
+
+        Args:
+            consumidor: Instância do consumidor Kafka que perderá as partições.
+            particoes: Partições que estão sendo revogadas.
+        """
+        ids = sorted(p.partition for p in particoes)
+        self.logger.warning(f"REBALANCO - partições REVOGADAS de {self.id_consumidor}: {ids}")
+
+    def on_lost(self, consumidor: Consumer, particoes: list[TopicPartition]) -> None:
+        """Callback disparado quando as partições são perdidas sem aviso prévio.
+
+        Ocorre, por exemplo, quando a sessão expira e o coordenador já as
+        reatribuiu a outro consumidor.
+
+        Args:
+            consumidor: Instância do consumidor Kafka que perdeu as partições.
+            particoes: Partições perdidas.
+        """
+        ids = sorted(p.partition for p in particoes)
+        self.logger.error(f"REBALANCO - partições PERDIDAS por {self.id_consumidor}: {ids}")
 
     def _signal_handler(self, signum: int, frame: FrameType | None) -> None:
         """Handle shutdown signals."""
@@ -242,7 +285,8 @@ async def main() -> None:
     GRUPO_CONSUMIDORES. Todas têm valor padrão.
     """
     # Lê a configuração do ambiente
-    id_consumidor = os.getenv("CONSUMER_ID", f"consumidor-{int(time.time())}")
+    # O hostname do container é único por réplica, mesmo com --scale
+    id_consumidor = os.getenv("CONSUMER_ID", f"consumidor-{socket.gethostname()}")
     brokers_kafka = os.getenv("KAFKA_BOOTSTRAP", "kafka1:19092,kafka2:19092,kafka3:19092")
     topico_sensor = os.getenv("TOPICO_SENSORES", "dados-sensores")
     grupo_consumidor = os.getenv("GRUPO_CONSUMIDORES", "processadores")
