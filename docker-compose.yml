@@ -273,8 +273,43 @@ services:
     networks:
       - fabrinteligente
 
-  # processador:
-  #   build: ./consumidor
+  # Três instâncias do consumidor no mesmo grupo: o Kafka divide as partições entre elas
+  consumidor-1:
+    container_name: consumidor-1
+    build: ./consumidor
+    depends_on: [kafka1, kafka2, kafka3]
+    environment:
+      CONSUMER_ID: consumidor-1 # Identificador desta instância
+      KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP} # Brokers (listener interno da rede Docker)
+      TOPICO_SENSORES: ${TOPICO_SENSORES} # Tópico de sensores que o consumidor vai escutar
+      GRUPO_CONSUMIDORES: ${GRUPO_CONSUMIDORES} # Grupo de consumidores para dividir as partições do tópico
+    networks:
+      - fabrinteligente
+
+  consumidor-2:
+    container_name: consumidor-2
+    build: ./consumidor
+    depends_on: [kafka1, kafka2, kafka3]
+    environment:
+      CONSUMER_ID: consumidor-2 # Identificador desta instância
+      KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP} # Brokers (listener interno da rede Docker)
+      TOPICO_SENSORES: ${TOPICO_SENSORES} # Tópico de sensores que o consumidor vai escutar
+      GRUPO_CONSUMIDORES: ${GRUPO_CONSUMIDORES} # Grupo de consumidores para dividir as partições do tópico
+    networks:
+      - fabrinteligente
+
+  consumidor-3:
+    container_name: consumidor-3
+    build: ./consumidor
+    depends_on: [kafka1, kafka2, kafka3]
+    environment:
+      CONSUMER_ID: consumidor-3 # Identificador desta instância
+      KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP} # Brokers (listener interno da rede Docker)
+      TOPICO_SENSORES: ${TOPICO_SENSORES} # Tópico de sensores que o consumidor vai escutar
+      GRUPO_CONSUMIDORES: ${GRUPO_CONSUMIDORES} # Grupo de consumidores para dividir as partições do tópico
+    networks:
+      - fabrinteligente
+
 
 networks:
   fabrinteligente:
