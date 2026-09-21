@@ -4,8 +4,10 @@ import asyncio
 import json
 import logging
 import os
+import signal
 import time
 from datetime import datetime
+from types import FrameType
 
 from confluent_kafka import Consumer
 
@@ -65,6 +67,10 @@ class ConsumidorSensor:
         self.consumidor.subscribe([self.topico_sensor])
         self.logger.info(f"Assinando tópico: {self.topico_sensor}")
 
+        # Configurar sinais de encerramento
+        signal.signal(signal.SIGINT, self._signal_handler)
+        signal.signal(signal.SIGTERM, self._signal_handler)
+
     def _configurar_logger(self) -> logging.Logger:
         """Configuração do logger."""
         # O nível de log pode ser configurado via variável de ambiente LOG_LEVEL
@@ -74,6 +80,11 @@ class ConsumidorSensor:
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         )
         return logging.getLogger(self.id_consumidor)
+
+    def _signal_handler(self, signum: int, frame: FrameType | None) -> None:
+        """Handle shutdown signals."""
+        self.logger.info(f"Received signal {signum}, shutting down...")
+        self.stop()
 
     def processar_mensagem(self, dados_mensagem: dict, mensagem: dict | None = None) -> None:
         """Processa a mensagem recebida do Kafka.
@@ -170,33 +181,39 @@ class ConsumidorSensor:
             f"(grupo: {self.grupo_consumidor}, tópico: {self.topico_sensor})"
         )
 
-        while self.rodando:
-            try:
-                # Poll para receber mensagens do Kafka
-                msg = self.consumidor.poll(timeout=1.0)
-
-                if msg is None:
-                    continue  # Nenhuma mensagem recebida, continua o loop
-
-                if msg.error():
-                    self.logger.error(f"Erro ao consumir mensagem: {msg.error()}")
-                    continue
-
+        try:
+            while self.rodando:
                 try:
-                    # Decodifica a mensagem recebida e processa
-                    dados_mensagem = json.loads(msg.value().decode("utf-8"))
+                    # Poll para receber mensagens do Kafka
+                    msg = self.consumidor.poll(timeout=1.0)
 
-                    # Processa a mensagem recebida
-                    self.processar_mensagem(dados_mensagem, msg)
+                    if msg is None:
+                        continue  # Nenhuma mensagem recebida, continua o loop
+
+                    if msg.error():
+                        self.logger.error(f"Erro ao consumir mensagem: {msg.error()}")
+                        continue
+
+                    try:
+                        # Decodifica a mensagem recebida e processa
+                        dados_mensagem = json.loads(msg.value().decode("utf-8"))
+
+                        # Processa a mensagem recebida
+                        self.processar_mensagem(dados_mensagem, msg)
+
+                    except Exception as e:
+                        self.logger.error(f"Erro ao processar mensagem: {e}")
+
+                    # Pequena pausa para evitar sobrecarga do loop
+                    await asyncio.sleep(0.1)
 
                 except Exception as e:
-                    self.logger.error(f"Erro ao processar mensagem: {e}")
+                    self.logger.error(f"Erro durante o consumo de mensagens: {e}")
 
-                # Pequena pausa para evitar sobrecarga do loop
-                await asyncio.sleep(0.1)
-
-            except Exception as e:
-                self.logger.error(f"Erro durante o consumo de mensagens: {e}")
+        except Exception as e:
+            self.logger.error(f"Erro no loop consumidor: {e}")
+        finally:
+            self.cleanup()
 
     def stop(self) -> None:
         """Encerra o consumidor.
