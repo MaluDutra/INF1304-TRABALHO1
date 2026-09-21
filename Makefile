@@ -16,14 +16,21 @@ BROKER ?= kafka2
 
 .PHONY: help setup start stop restart clean status health logs topics esperar-kafka \
 	construir-consumidores iniciar-consumidores parar-consumidores reiniciar-consumidores \
-	logs-consumidores grupo-consumidores escalar falha-consumidor falha-broker
+	logs-consumidores grupo-consumidores escalar falha-consumidor falha-broker recuperar-broker
+
+# Cria o .env a partir do .env.example quando ele não existe (nunca sobrescreve um .env existente,
+# por isso o .env.example é pré-requisito apenas de ordem). Como o .env é incluído acima, o make
+# se reexecuta sozinho após criá-lo e já enxerga as variáveis.
+.env: | .env.example
+	@cp .env.example .env
+	@echo "Arquivo .env criado a partir de .env.example"
 
 # Alvo padrão
 help:
 	@echo "Fábrica Inteligente - Comandos disponíveis:"
 	@echo ""
 	@echo "Geral:"
-	@echo "  setup             	     - Verifica se o arquivo .env existe"
+	@echo "  setup             	     - Cria o .env a partir do .env.example, se não existir"
 	@echo "  start             	     - Inicia o cluster Kafka e cria os tópicos"
 	@echo "  stop             	     - Para todos os serviços"
 	@echo "  restart	      	     - Reinicia todos os serviços"
@@ -46,11 +53,11 @@ help:
 	@echo "Simulação de falhas:"
 	@echo "  falha-consumidor       - Derruba uma réplica do consumidor (rebalanço)"
 	@echo "  falha-broker           - Derruba um broker Kafka (BROKER=kafka2 por padrão)"
+	@echo "  recuperar-broker       - Religa o broker derrubado (BROKER=kafka2 por padrão)"
 
-# Verifica se o ambiente está configurado
-setup:
-	@if [ ! -f .env ]; then echo "Erro: arquivo .env não encontrado!"; exit 1; fi
-	@echo "Ambiente configurado com sucesso!"
+# Configura o ambiente: garante o .env (copiado de .env.example se não existir)
+setup: .env
+	@echo "Ambiente configurado com sucesso! (edite o .env para ajustar a configuração)"
 
 # Inicia o cluster Kafka e cria os tópicos
 start: setup
@@ -188,3 +195,19 @@ falha-broker:
 	@echo "Derrubando o broker $(BROKER)..."
 	@docker stop $(BROKER) >/dev/null
 	@echo "Broker derrubado! Verifique com: make health"
+
+# Religa um broker derrubado e espera ele voltar a responder (ex.: make recuperar-broker BROKER=kafka3)
+# Os dados do broker persistem no volume, então ele volta ao cluster e ressincroniza as réplicas
+recuperar-broker:
+	@echo "Recuperando o broker $(BROKER)..."
+	@docker compose start $(BROKER) >/dev/null
+	@for i in $$(seq 1 60); do \
+		if docker compose exec -T $(BROKER) $(KAFKA_CLI)/kafka-broker-api-versions.sh --bootstrap-server $(BROKER):19092 >/dev/null 2>&1; then \
+			echo "✓ Broker $(BROKER) recuperado! Verifique com: make health"; \
+			exit 0; \
+		fi; \
+		echo "Broker $(BROKER) iniciando... ($$i/60)"; \
+		sleep 2; \
+	done; \
+	echo "✗ Tempo esgotado aguardando o broker $(BROKER)"; \
+	exit 1
