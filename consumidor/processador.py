@@ -160,7 +160,7 @@ class ConsumidorSensor:
             Dicionário com os limites de perigo para cada parâmetro.
         """
         return {
-            "temperatura": float(os.getenv("TEMP_MAX", "50.0")),
+            "temperatura": float(os.getenv("TEMP_LIMITE", "50.0")),
             "vibracao": float(os.getenv("VIBRACAO_LIMITE", "10.0")),
             "umidade": float(os.getenv("UMIDADE_LIMITE", "80.0")),
             "consumo_energia": float(os.getenv("ENERGIA_LIMITE", "200.0")),

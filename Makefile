@@ -8,7 +8,9 @@ export
 KAFKA_CLI = /opt/kafka/bin
 BROKER_INTERNO = kafka1:19092
 BROKERS = kafka1 kafka2 kafka3
-CONSUMIDORES = consumidor-1 consumidor-2 consumidor-3
+# Serviço único do consumidor no docker-compose.yml, escalado em réplicas (todas no mesmo grupo)
+CONSUMIDOR = consumidor
+NUM_CONSUMIDORES ?= 3
 
 .PHONY: help setup start stop restart clean status health logs topics esperar-kafka \
 	construir-consumidores iniciar-consumidores parar-consumidores reiniciar-consumidores \
@@ -32,7 +34,7 @@ help:
 	@echo ""
 	@echo "Consumidores:"
 	@echo "  construir-consumidores - Constrói a imagem dos consumidores"
-	@echo "  iniciar-consumidores   - Inicia os consumidores"
+	@echo "  iniciar-consumidores   - Inicia os consumidores (NUM_CONSUMIDORES=3 réplicas por padrão)"
 	@echo "  parar-consumidores     - Para os consumidores"
 	@echo "  reiniciar-consumidores - Reconstrói e reinicia os consumidores"
 	@echo "  logs-consumidores      - Mostra os logs dos consumidores"
@@ -126,29 +128,29 @@ esperar-kafka:
 
 # Constrói a imagem dos consumidores
 construir-consumidores:
-	@echo "Construindo as imagens dos consumidores..."
-	@docker compose build $(CONSUMIDORES)
-	@echo "Imagens dos consumidores construídas com sucesso!"
+	@echo "Construindo a imagem dos consumidores..."
+	@docker compose build $(CONSUMIDOR)
+	@echo "Imagem dos consumidores construída com sucesso!"
 
-# Inicia os consumidores
+# Inicia os consumidores (réplicas do serviço, ex.: make iniciar-consumidores NUM_CONSUMIDORES=2)
 iniciar-consumidores:
-	@echo "Iniciando os consumidores..."
-	@docker compose up -d $(CONSUMIDORES)
+	@echo "Iniciando $(NUM_CONSUMIDORES) consumidores..."
+	@docker compose up -d --scale $(CONSUMIDOR)=$(NUM_CONSUMIDORES) $(CONSUMIDOR)
 	@echo "Consumidores iniciados com sucesso!"
 
 # Para os consumidores
 parar-consumidores:
 	@echo "Parando os consumidores..."
-	@docker compose stop $(CONSUMIDORES)
+	@docker compose stop $(CONSUMIDOR)
 	@echo "Consumidores parados!"
 
 # Reconstrói e reinicia os consumidores (útil após alterar o processador.py)
 reiniciar-consumidores: parar-consumidores construir-consumidores iniciar-consumidores
 
-# Mostra os logs dos consumidores
+# Mostra os logs de todas as réplicas dos consumidores
 logs-consumidores:
 	@echo "Mostrando os logs dos consumidores (Ctrl+C para sair)..."
-	@docker compose logs -f $(CONSUMIDORES)
+	@docker compose logs -f --tail=100 $(CONSUMIDOR)
 
 # Mostra as partições atribuídas a cada consumidor e o lag do grupo
 grupo-consumidores:
