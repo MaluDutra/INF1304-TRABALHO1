@@ -9,7 +9,7 @@ import socket
 from datetime import datetime
 from types import FrameType
 
-from confluent_kafka import Consumer, Message, TopicPartition
+from confluent_kafka import Consumer, KafkaError, KafkaException, Message, TopicPartition
 
 
 class ConsumidorSensor:
@@ -50,8 +50,8 @@ class ConsumidorSensor:
             "group.id": self.grupo_consumidor,
             "client.id": self.id_consumidor,
             "auto.offset.reset": "earliest",
-            "enable.auto.commit": True,
-            "auto.commit.interval.ms": 5000,
+            "enable.auto.commit": False,  # Desabilita commit automático; faremos no on_revoke
+            "partition.assignment.strategy": "cooperative-sticky", # Minimiza redistribuições
             # Tempo sem heartbeat até o coordenador considerar o consumidor morto
             # e disparar o rebalanço (define a velocidade do failover)
             "session.timeout.ms": int(os.getenv("SESSION_TIMEOUT_MS", "10000")),
@@ -113,6 +113,13 @@ class ConsumidorSensor:
         """
         ids = sorted(p.partition for p in particoes)
         self.logger.warning(f"REBALANCO - partições REVOGADAS de {self.id_consumidor}: {ids}")
+
+        try:
+            consumidor.commit(asynchronous=False)   # síncrono: tem que terminar antes de devolver
+        except KafkaException as e:
+            # KafkaError._NO_OFFSET = nada a commitar (ex.: rebalanço logo após a subida)
+            if e.args[0].code() != KafkaError._NO_OFFSET:
+                self.logger.error(f"Erro ao commitar no rebalanço: {e}")
 
     def on_lost(self, consumidor: Consumer, particoes: list[TopicPartition]) -> None:
         """Callback disparado quando as partições são perdidas sem aviso prévio.
