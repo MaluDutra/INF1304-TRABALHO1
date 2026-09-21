@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import time
+from datetime import datetime
 
 from confluent_kafka import Consumer
 
@@ -83,7 +84,7 @@ class ConsumidorSensor:
         """
         sensor_id = dados_mensagem.get("sensor_id")
         setor = dados_mensagem.get("setor")
-        timestamp = dados_mensagem.get("timestamp")
+        timestamp = self._formatar_timestamp(dados_mensagem.get("timestamp"))
         temperatura = dados_mensagem.get("temperatura")
         vibracao = dados_mensagem.get("vibracao")
         umidade = dados_mensagem.get("umidade")
@@ -103,6 +104,22 @@ class ConsumidorSensor:
             f"Consumo de Energia: {consumo_energia} {particao_str}"
         )
 
+    @staticmethod
+    def _formatar_timestamp(timestamp: float | None) -> str:
+        """Converte um timestamp Unix em uma data legível.
+
+        Args:
+            timestamp: Segundos desde a época Unix, como enviado pelo produtor.
+
+        Returns:
+            Data no formato "YYYY-MM-DD HH:MM:SS", ou o valor original como texto
+            caso não seja um timestamp válido.
+        """
+        try:
+            return datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S")
+        except (TypeError, ValueError, OverflowError, OSError):
+            return str(timestamp)
+
     def _detectar_perigo(self, dados_mensagem: dict) -> str | None:
         """Detecta se algum parâmetro do sensor excede os limites de perigo.
 
@@ -121,7 +138,7 @@ class ConsumidorSensor:
                 valor = dados_mensagem.get(parametro)
                 sensor_id = dados_mensagem.get("sensor_id")
                 setor = dados_mensagem.get("setor")
-                timestamp = dados_mensagem.get("timestamp")
+                timestamp = self._formatar_timestamp(dados_mensagem.get("timestamp"))
                 return (
                     f"Sensor {sensor_id} no setor {setor} excedeu o limite "
                     f"de {parametro}. Valor: {valor}, Limite: {limite}, "
