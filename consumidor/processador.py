@@ -9,7 +9,7 @@ import socket
 from datetime import datetime
 from types import FrameType
 
-from confluent_kafka import Consumer, TopicPartition
+from confluent_kafka import Consumer, Message, TopicPartition
 
 
 class ConsumidorSensor:
@@ -132,7 +132,7 @@ class ConsumidorSensor:
         self.logger.info(f"Received signal {signum}, shutting down...")
         self.stop()
 
-    def processar_mensagem(self, dados_mensagem: dict, mensagem: dict | None = None) -> None:
+    def processar_mensagem(self, dados_mensagem: dict, mensagem: Message | None = None) -> None:
         """Processa a mensagem recebida do Kafka.
 
         Args:
@@ -181,7 +181,6 @@ class ConsumidorSensor:
         """Detecta se algum parâmetro do sensor excede os limites de perigo.
 
         Args:
-            sensor_id: Identificador do sensor.
             dados_mensagem: Dicionário contendo os dados da mensagem.
 
         Returns:
@@ -191,7 +190,7 @@ class ConsumidorSensor:
 
         # Verifica cada parâmetro contra seu limite
         for parametro, limite in limites.items():
-            if dados_mensagem.get(parametro) > limite:
+            if dados_mensagem.get(parametro, 0) > limite:
                 valor = dados_mensagem.get(parametro)
                 sensor_id = dados_mensagem.get("sensor_id")
                 setor = dados_mensagem.get("setor")
@@ -249,9 +248,6 @@ class ConsumidorSensor:
 
                     except Exception as e:
                         self.logger.error(f"Erro ao processar mensagem: {e}")
-
-                    # Pequena pausa para evitar sobrecarga do loop
-                    await asyncio.sleep(0.1)
 
                 except Exception as e:
                     self.logger.error(f"Erro durante o consumo de mensagens: {e}")
