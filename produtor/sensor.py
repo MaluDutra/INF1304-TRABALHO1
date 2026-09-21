@@ -25,27 +25,24 @@ TOPICO = os.environ["TOPICO_SENSORES"]
 INTERVALO = float(os.environ.get("INTERVALO_SEGUNDOS", "2"))
 
 SENSOR_ID = os.environ.get("SENSOR_ID", socket.gethostname())
-SETOR = os.environ["SETOR"]        # setor fixo da máquina
+SETOR = os.environ["SETOR"]  # setor fixo da máquina
 
 # Faixas de simulação: definem os valores mínimos e máximos que o
 # sensor pode reportar.
 FAIXAS = {
-    "temperatura": (float(os.environ["TEMP_MIN"]),
-                    float(os.environ["TEMP_MAX"])),
-    "vibracao": (float(os.environ["VIBRACAO_MIN"]),
-                 float(os.environ["VIBRACAO_MAX"])),
-    "umidade": (float(os.environ["UMIDADE_MIN"]),
-                float(os.environ["UMIDADE_MAX"])),
-    "consumo_energia": (float(os.environ["ENERGIA_MIN"]),
-                        float(os.environ["ENERGIA_MAX"])),
+    "temperatura": (float(os.environ["TEMP_MIN"]), float(os.environ["TEMP_MAX"])),
+    "vibracao": (float(os.environ["VIBRACAO_MIN"]), float(os.environ["VIBRACAO_MAX"])),
+    "umidade": (float(os.environ["UMIDADE_MIN"]), float(os.environ["UMIDADE_MAX"])),
+    "consumo_energia": (float(os.environ["ENERGIA_MIN"]), float(os.environ["ENERGIA_MAX"])),
 }
+
 
 def gerar_leitura(sensor_id: str) -> dict:
     """
     Gera uma leitura simulada de um sensor da fábrica.
 
-    Cada grandeza é sorteada dentro da faixa configurada, 
-    de modo que valores acima dos limites de alerta 
+    Cada grandeza é sorteada dentro da faixa configurada,
+    de modo que valores acima dos limites de alerta
     ocorram com alguma frequência.
 
     :param sensor_id: identificador do sensor que gerou a leitura.
@@ -63,6 +60,7 @@ def gerar_leitura(sensor_id: str) -> dict:
 
     return leitura
 
+
 def callback_entrega(erro, msg):
     """
     Callback chamado pelo cliente Kafka de forma assíncrona,
@@ -75,6 +73,7 @@ def callback_entrega(erro, msg):
         print(f"[ERRO] Falha ao entregar mensagem: {erro}")
     else:
         print(f"[OK] {msg.topic()} partição={msg.partition()} offset={msg.offset()}")
+
 
 def main():
     """
@@ -109,6 +108,7 @@ def main():
         print(f"[{SENSOR_ID}] encerrando...")
     finally:
         produtor.flush()  # garante que tudo que estava na fila é enviado
+
 
 if __name__ == "__main__":
     main()
