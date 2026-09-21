@@ -134,8 +134,144 @@ services:
     networks:
       - fabrinteligente
 
-  # sensor:
-  #   build: ./produtor
+  # Um sensor para cada máquina: setor-máquina (o nome de cada máquina é composto por três letras maiúsculas)
+  sensor_trn:
+    build: ./produtor
+    depends_on:
+      - kafka1
+      - kafka2
+      - kafka3
+    environment:
+      SENSOR_ID: producao-TRN
+      SETOR: producao
+      KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP}
+      TOPICO_SENSORES: ${TOPICO_SENSORES}
+      INTERVALO_SEGUNDOS: ${INTERVALO_SEGUNDOS}
+      TEMP_MIN: ${TEMP_MIN}
+      TEMP_MAX: ${TEMP_MAX}
+      VIBRACAO_MIN: ${VIBRACAO_MIN}
+      VIBRACAO_MAX: ${VIBRACAO_MAX}
+      UMIDADE_MIN: ${UMIDADE_MIN}
+      UMIDADE_MAX: ${UMIDADE_MAX}
+      ENERGIA_MIN: ${ENERGIA_MIN}
+      ENERGIA_MAX: ${ENERGIA_MAX}
+    networks:
+      - fabrinteligente
+
+  sensor_frs:
+    build: ./produtor
+    depends_on:
+      - kafka1
+      - kafka2
+      - kafka3
+    environment:
+      SENSOR_ID: producao-FRS
+      SETOR: producao
+      KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP}
+      TOPICO_SENSORES: ${TOPICO_SENSORES}
+      INTERVALO_SEGUNDOS: ${INTERVALO_SEGUNDOS}
+      TEMP_MIN: ${TEMP_MIN}
+      TEMP_MAX: ${TEMP_MAX}
+      VIBRACAO_MIN: ${VIBRACAO_MIN}
+      VIBRACAO_MAX: ${VIBRACAO_MAX}
+      UMIDADE_MIN: ${UMIDADE_MIN}
+      UMIDADE_MAX: ${UMIDADE_MAX}
+      ENERGIA_MIN: ${ENERGIA_MIN}
+      ENERGIA_MAX: ${ENERGIA_MAX}
+    networks:
+      - fabrinteligente
+  
+  sensor_cnd:
+    build: ./produtor
+    depends_on:
+      - kafka1
+      - kafka2
+      - kafka3
+    environment:
+      SENSOR_ID: refrigeracao-CND
+      SETOR: refrigeracao
+      KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP}
+      TOPICO_SENSORES: ${TOPICO_SENSORES}
+      INTERVALO_SEGUNDOS: ${INTERVALO_SEGUNDOS}
+      TEMP_MIN: ${TEMP_MIN}
+      TEMP_MAX: ${TEMP_MAX}
+      VIBRACAO_MIN: ${VIBRACAO_MIN}
+      VIBRACAO_MAX: ${VIBRACAO_MAX}
+      UMIDADE_MIN: ${UMIDADE_MIN}
+      UMIDADE_MAX: ${UMIDADE_MAX}
+      ENERGIA_MIN: ${ENERGIA_MIN}
+      ENERGIA_MAX: ${ENERGIA_MAX}
+    networks:
+      - fabrinteligente
+
+  sensor_cmp:
+    build: ./produtor
+    depends_on:
+      - kafka1
+      - kafka2
+      - kafka3
+    environment:
+      SENSOR_ID: refrigeracao-CMP
+      SETOR: refrigeracao
+      KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP}
+      TOPICO_SENSORES: ${TOPICO_SENSORES}
+      INTERVALO_SEGUNDOS: ${INTERVALO_SEGUNDOS}
+      TEMP_MIN: ${TEMP_MIN}
+      TEMP_MAX: ${TEMP_MAX}
+      VIBRACAO_MIN: ${VIBRACAO_MIN}
+      VIBRACAO_MAX: ${VIBRACAO_MAX}
+      UMIDADE_MIN: ${UMIDADE_MIN}
+      UMIDADE_MAX: ${UMIDADE_MAX}
+      ENERGIA_MIN: ${ENERGIA_MIN}
+      ENERGIA_MAX: ${ENERGIA_MAX}
+    networks:
+      - fabrinteligente
+  
+  sensor_sel:
+    build: ./produtor
+    depends_on:
+      - kafka1
+      - kafka2
+      - kafka3
+    environment:
+      SENSOR_ID: empacotamento-SEL
+      SETOR: empacotamento
+      KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP}
+      TOPICO_SENSORES: ${TOPICO_SENSORES}
+      INTERVALO_SEGUNDOS: ${INTERVALO_SEGUNDOS}
+      TEMP_MIN: ${TEMP_MIN}
+      TEMP_MAX: ${TEMP_MAX}
+      VIBRACAO_MIN: ${VIBRACAO_MIN}
+      VIBRACAO_MAX: ${VIBRACAO_MAX}
+      UMIDADE_MIN: ${UMIDADE_MIN}
+      UMIDADE_MAX: ${UMIDADE_MAX}
+      ENERGIA_MIN: ${ENERGIA_MIN}
+      ENERGIA_MAX: ${ENERGIA_MAX}
+    networks:
+      - fabrinteligente
+
+  sensor_rot:
+    build: ./produtor
+    depends_on:
+      - kafka1
+      - kafka2
+      - kafka3
+    environment:
+      SENSOR_ID: empacotamento-ROT
+      SETOR: empacotamento
+      KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP}
+      TOPICO_SENSORES: ${TOPICO_SENSORES}
+      INTERVALO_SEGUNDOS: ${INTERVALO_SEGUNDOS}
+      TEMP_MIN: ${TEMP_MIN}
+      TEMP_MAX: ${TEMP_MAX}
+      VIBRACAO_MIN: ${VIBRACAO_MIN}
+      VIBRACAO_MAX: ${VIBRACAO_MAX}
+      UMIDADE_MIN: ${UMIDADE_MIN}
+      UMIDADE_MAX: ${UMIDADE_MAX}
+      ENERGIA_MIN: ${ENERGIA_MIN}
+      ENERGIA_MAX: ${ENERGIA_MAX}
+    networks:
+      - fabrinteligente
 
   # Três instâncias do consumidor no mesmo grupo: o Kafka divide as partições entre elas
   consumidor-1:
