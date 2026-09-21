@@ -1,6 +1,7 @@
 """Processador de dados de sensores Kafka."""
 
 import asyncio
+import json
 import logging
 import os
 import time
@@ -19,7 +20,11 @@ class ConsumidorSensor:
     """
 
     def __init__(
-        self, id_consumidor: str, brokers_kafka: str, topico_sensor: str, grupo_consumidor: str
+        self,
+        id_consumidor: str,
+        brokers_kafka: str,
+        topico_sensor: str,
+        grupo_consumidor: str,
     ) -> None:
         """Inicializa o consumidor Kafka de dados de sensores.
 
@@ -34,6 +39,7 @@ class ConsumidorSensor:
         self.topico_sensor = topico_sensor
         self.grupo_consumidor = grupo_consumidor
         self.logger = self._configurar_logger()
+        self.rodando = False
 
         # Configuração do consumidor Kafka
         consumidor_config = {
@@ -49,6 +55,7 @@ class ConsumidorSensor:
 
         try:
             self.consumidor = Consumer(consumidor_config)
+            self.logger.info("Consumidor Kafka inicializado com sucesso")
         except Exception as e:
             self.logger.error(f"Erro ao inicializar o consumidor Kafka: {e}")
             raise
@@ -67,21 +74,69 @@ class ConsumidorSensor:
         )
         return logging.getLogger(self.id_consumidor)
 
+    def processar_mensagem(self, dados_mensagem: dict) -> None:
+        """Processa a mensagem recebida do Kafka.
+
+        Args:
+            dados_mensagem: Dicionário contendo os dados da mensagem.
+        """
+        # Aqui você pode implementar a lógica de processamento dos dados do sensor
+        self.logger.info(f"Mensagem recebida: {dados_mensagem}")
+
     async def run(self) -> None:
         """Escuta e processa mensagens do tópico de sensores.
 
         Executa até ser interrompido.
         """
-        # Consumo de mensagens do Kafka (implementação pendente)
-        pass
+        self.rodando = True
+        self.logger.info(
+            f"Inicializando consumidor de sensores: {self.id_consumidor} "
+            f"(grupo: {self.grupo_consumidor}, tópico: {self.topico_sensor})"
+        )
+
+        while self.rodando:
+            try:
+                # Poll para receber mensagens do Kafka
+                msg = self.consumidor.poll(timeout=1.0)
+
+                if msg is None:
+                    continue  # Nenhuma mensagem recebida, continua o loop
+
+                if msg.error():
+                    self.logger.error(f"Erro ao consumir mensagem: {msg.error()}")
+                    continue
+
+                try:
+                    # Decodifica a mensagem recebida e processa
+                    dados_mensagem = json.loads(msg.value().decode("utf-8"))
+
+                    # Processa a mensagem recebida
+                    self.processar_mensagem(dados_mensagem)
+
+                except Exception as e:
+                    self.logger.error(f"Erro ao processar mensagem: {e}")
+
+                # Pequena pausa para evitar sobrecarga do loop
+                await asyncio.sleep(0.1)
+
+            except Exception as e:
+                self.logger.error(f"Erro durante o consumo de mensagens: {e}")
 
     def stop(self) -> None:
         """Encerra o consumidor.
 
         Deve liberar as conexões com o Kafka de forma limpa.
         """
-        # Encerramento do consumidor (implementação pendente)
-        pass
+        self.logger.info("Parando o consumidor...")
+        self.rodando = False
+
+    def cleanup(self) -> None:
+        """Libera recursos do consumidor Kafka."""
+        try:
+            self.consumidor.close()
+            self.logger.info("Consumidor Kafka encerrado com sucesso")
+        except Exception as e:
+            self.logger.error(f"Erro ao encerrar o consumidor Kafka: {e}")
 
 
 async def main() -> None:
