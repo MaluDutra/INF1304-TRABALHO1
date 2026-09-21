@@ -150,7 +150,7 @@ class ConsumidorSensor:
         # Verifica se algum parâmetro excede os limites de perigo
         alerta = self._detectar_perigo(dados_mensagem)
         if alerta:
-            self.logger.warning(f"ALERTA: {alerta}")
+            self.logger.warning(alerta)
 
         # Logando os dados recebidos
         particao_str = f"[particao {mensagem.partition()}]" if mensagem else ""
@@ -187,6 +187,7 @@ class ConsumidorSensor:
             Mensagem de alerta se algum parâmetro exceder o limite, ou None caso contrário.
         """
         limites = self._limites_perigosos()
+        alerta = []
 
         # Verifica cada parâmetro contra seu limite
         for parametro, limite in limites.items():
@@ -195,12 +196,12 @@ class ConsumidorSensor:
                 sensor_id = dados_mensagem.get("sensor_id")
                 setor = dados_mensagem.get("setor")
                 timestamp = self._formatar_timestamp(dados_mensagem.get("timestamp"))
-                return (
-                    f"Sensor {sensor_id} no setor {setor} excedeu o limite "
+                alerta.append(
+                    f"ALERTA: Sensor {sensor_id} no setor {setor} excedeu o limite "
                     f"de {parametro}. Valor: {valor}, Limite: {limite}, "
-                    f"Timestamp: {timestamp}"
+                    f"Timestamp: {timestamp}."
                 )
-        return None
+        return "\n".join(alerta) if alerta else None
 
     def _limites_perigosos(self) -> dict:
         """Retorna os limites de perigo para cada parâmetro do sensor.
