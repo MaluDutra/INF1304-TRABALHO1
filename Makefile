@@ -1,213 +1,131 @@
-# Makefile da Fábrica Inteligente
-# Comandos para gerenciar o sistema distribuído (Kafka, sensores e consumidores)
+# =============================================================
+# Fábrica Inteligente - Kafka + Kubernetes
+# Execute "make" ou "make help" para ver os alvos disponíveis.
+# =============================================================
 
-# Carrega as variáveis do .env (TOPICO_SENSORES, PARTICOES, REPLICACAO, GRUPO_CONSUMIDORES...)
 -include .env
 export
 
-KAFKA_CLI = /opt/kafka/bin
-BROKER_INTERNO = kafka1:19092
-BROKERS = kafka1 kafka2 kafka3
-# Serviço único do consumidor no docker-compose.yml, escalado em réplicas (todas no mesmo grupo)
-CONSUMIDOR = consumidor
-NUM_CONSUMIDORES ?= 3
-# Broker derrubado por falha-broker (ex.: make falha-broker BROKER=kafka3)
-BROKER ?= kafka2
+NS          ?= fabrinteligente
+BROKER      ?= kafka-1-0
+BOOTSTRAP   ?= kafka-1-0.kafka-headless:9092
+TOPICO      ?= $(TOPICO_SENSORES)
+GRUPO       ?= $(GRUPO_CONSUMIDORES)
+RENDER_DIR  := k8s/.rendered
+# Apenas estas variáveis são substituídas nos manifestos; as demais
+# (usadas dentro dos containers) precisam chegar intactas.
+SUBST_VARS  := '$$DOCKER_USER $$TAG_SENSOR $$TAG_CONSUMIDOR'
 
-.PHONY: help setup start stop restart clean status health logs topics esperar-kafka \
-	construir-consumidores iniciar-consumidores parar-consumidores reiniciar-consumidores \
-	logs-consumidores grupo-consumidores escalar falha-consumidor falha-broker recuperar-broker
+.DEFAULT_GOAL := help
 
-# Cria o .env a partir do .env.example quando ele não existe (nunca sobrescreve um .env existente,
-# por isso o .env.example é pré-requisito apenas de ordem). Como o .env é incluído acima, o make
-# se reexecuta sozinho após criá-lo e já enxerga as variáveis.
-.env: | .env.example
-	@cp .env.example .env
-	@echo "Arquivo .env criado a partir de .env.example"
+help: ## Mostra esta ajuda
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
+	 | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-# Alvo padrão
-help:
-	@echo "Fábrica Inteligente - Comandos disponíveis:"
-	@echo ""
-	@echo "Geral:"
-	@echo "  setup             	     - Cria o .env a partir do .env.example, se não existir"
-	@echo "  start             	     - Inicia o cluster Kafka e cria os tópicos"
-	@echo "  stop             	     - Para todos os serviços"
-	@echo "  restart	      	     - Reinicia todos os serviços"
-	@echo "  clean            	     - Remove containers e volumes do projeto"
-	@echo "  status           	     - Mostra o estado dos serviços"
-	@echo "  health           	     - Verifica a saúde dos brokers Kafka"
-	@echo "  logs             	     - Mostra os logs agregados"
-	@echo "  logs-<serviço>   	     - Mostra os logs de um serviço (ex.: logs-kafka1)"
-	@echo "  topics           	     - Cria os tópicos do Kafka"
-	@echo ""
-	@echo "Consumidores:"
-	@echo "  construir-consumidores - Constrói a imagem dos consumidores"
-	@echo "  iniciar-consumidores   - Inicia os consumidores (NUM_CONSUMIDORES=3 réplicas por padrão)"
-	@echo "  parar-consumidores     - Para os consumidores"
-	@echo "  reiniciar-consumidores - Reconstrói e reinicia os consumidores"
-	@echo "  logs-consumidores      - Mostra os logs dos consumidores"
-	@echo "  grupo-consumidores     - Mostra as partições e o lag do grupo de consumidores"
-	@echo "  escalar N=<n>          - Altera o número de réplicas sem recriar as existentes"
-	@echo ""
-	@echo "Simulação de falhas:"
-	@echo "  falha-consumidor       - Derruba uma réplica do consumidor (rebalanço)"
-	@echo "  falha-broker           - Derruba um broker Kafka (BROKER=kafka2 por padrão)"
-	@echo "  recuperar-broker       - Religa o broker derrubado (BROKER=kafka2 por padrão)"
+# ---------- Possíveis ajustes necessários ----------
 
-# Configura o ambiente: garante o .env (copiado de .env.example se não existir)
-setup: .env
-	@echo "Ambiente configurado com sucesso! (edite o .env para ajustar a configuração)"
+configmap: ## Regenera o ConfigMap a partir do .env
+	@grep -vE '^(#|$$|DOCKER_USER=|TAG_|KAFKA_CLUSTER_ID=)' .env \
+	 | sed 's/\r$$//' > /tmp/fabrica.env
+	kubectl create configmap fabrica-config --from-env-file=/tmp/fabrica.env \
+		-n $(NS) --dry-run=client -o yaml > k8s/configmap.yaml
+	kubectl apply -f k8s/configmap.yaml
+	kubectl rollout restart deployment -l app=sensor -n $(NS)
+	kubectl rollout restart deployment consumidor -n $(NS)
 
-# Inicia o cluster Kafka e cria os tópicos
-start: setup
-	@echo "Iniciando o cluster Kafka..."
-	@docker compose up -d $(BROKERS)
-	@$(MAKE) --no-print-directory esperar-kafka
-	@$(MAKE) --no-print-directory topics
-	@echo "Cluster Kafka iniciado com sucesso!"
+# ---------- Imagens ----------
 
-# Para todos os serviços
-stop:
-	@echo "Parando o sistema..."
-	@docker compose down
-	@echo "Sistema parado com sucesso!"
+build: ## Constrói as imagens Docker localmente
+	docker build -t $(DOCKER_USER)/fabrica-sensor:$(TAG_SENSOR) ./produtor
+	docker build -t $(DOCKER_USER)/fabrica-consumidor:$(TAG_CONSUMIDOR) ./consumidor
 
-# Reinicia todos os serviços
-restart: stop start
+push: ## Publica as imagens no Docker Hub
+	docker push $(DOCKER_USER)/fabrica-sensor:$(TAG_SENSOR)
+	docker push $(DOCKER_USER)/fabrica-consumidor:$(TAG_CONSUMIDOR)
 
-# Remove containers, redes e volumes do projeto
-clean:
-	@echo "Isto removerá os containers, redes e volumes do projeto!"
-	@read -p "Tem certeza? [s/N] " confirmacao && [ "$$confirmacao" = "s" ] || exit 1
-	@docker compose down -v --remove-orphans
-	@echo "Limpeza concluída!"
+publicar: build push ## Constrói e publica as imagens
 
-# Mostra o estado dos serviços
-status:
-	@echo "Estado dos serviços:"
-	@echo "===================="
-	@docker compose ps
+# ---------- Manifestos ----------
 
-# Verifica a saúde dos brokers Kafka
-health:
-	@echo "Verificando a saúde dos brokers..."
-	@echo "=================================="
-	@for broker in $(BROKERS); do \
-		docker compose exec -T $$broker $(KAFKA_CLI)/kafka-broker-api-versions.sh --bootstrap-server $$broker:19092 >/dev/null 2>&1 \
-			&& echo "✓ $$broker: saudável" || echo "✗ $$broker: indisponível"; \
+render: ## Renderiza os manifestos substituindo DOCKER_USER e as tags
+	@mkdir -p $(RENDER_DIR)
+	@for f in k8s/*.yaml; do \
+		envsubst $(SUBST_VARS) < $$f > $(RENDER_DIR)/$$(basename $$f); \
 	done
+	@echo "Manifestos renderizados em $(RENDER_DIR)/"
 
-# Mostra os logs agregados
-logs:
-	@echo "Mostrando os logs do sistema (Ctrl+C para sair)..."
-	@docker compose logs -f
+up: render ## Sobe todo o sistema no cluster
+	kubectl apply -f $(RENDER_DIR)/namespace.yaml
+	kubectl apply -f $(RENDER_DIR)/configmap.yaml
+	kubectl apply -f $(RENDER_DIR)/kafka.yaml
+	@echo "Aguardando os brokers ficarem prontos..."
+	kubectl wait --for=condition=ready pod -l app=kafka -n $(NS) --timeout=180s
+	kubectl apply -f $(RENDER_DIR)/criar-topico.yaml
+	kubectl wait --for=condition=complete job/criar-topico -n $(NS) --timeout=120s
+	kubectl apply -f $(RENDER_DIR)/sensores.yaml
+	kubectl apply -f $(RENDER_DIR)/consumidor.yaml
+	kubectl apply -f $(RENDER_DIR)/hpa.yaml
 
-# Mostra os logs de um serviço específico
-logs-%:
-	@echo "Mostrando os logs de $* (Ctrl+C para sair)..."
-	@docker compose logs -f --tail=100 $*
+down: ## Remove todos os recursos (preserva os volumes)
+	kubectl delete namespace $(NS) --ignore-not-found
 
-# Cria os tópicos do Kafka
-topics:
-	@echo "Criando o tópico $(TOPICO_SENSORES)..."
-	@docker compose exec -T kafka1 $(KAFKA_CLI)/kafka-topics.sh \
-		--bootstrap-server $(BROKER_INTERNO) \
-		--create \
-		--topic $(TOPICO_SENSORES) \
-		--partitions $(PARTICOES) \
-		--replication-factor $(REPLICACAO) \
-		--if-not-exists
-	@echo "Tópicos existentes:"
-	@docker compose exec -T kafka1 $(KAFKA_CLI)/kafka-topics.sh --bootstrap-server $(BROKER_INTERNO) --list
+# ---------- Tópico ----------
 
-# Espera os brokers Kafka ficarem prontos
-esperar-kafka:
-	@echo "Aguardando os brokers Kafka ficarem prontos..."
-	@for i in $$(seq 1 60); do \
-		pronto=1; \
-		for broker in $(BROKERS); do \
-			docker compose exec -T $$broker $(KAFKA_CLI)/kafka-broker-api-versions.sh --bootstrap-server $$broker:19092 >/dev/null 2>&1 || pronto=0; \
-		done; \
-		if [ $$pronto -eq 1 ]; then \
-			echo "✓ Todos os brokers Kafka estão prontos!"; \
-			exit 0; \
-		fi; \
-		echo "Brokers Kafka iniciando... ($$i/60)"; \
-		sleep 2; \
-	done; \
-	echo "✗ Tempo esgotado aguardando os brokers Kafka"; \
-	$(MAKE) --no-print-directory health; \
-	exit 1
+topico: ## Mostra partições, líderes e réplicas do tópico
+	kubectl exec -n $(NS) $(BROKER) -- /opt/kafka/bin/kafka-topics.sh \
+		--bootstrap-server $(BOOTSTRAP) --describe --topic $(TOPICO)
 
-# Constrói a imagem dos consumidores
-construir-consumidores:
-	@echo "Construindo a imagem dos consumidores..."
-	@docker compose build $(CONSUMIDOR)
-	@echo "Imagem dos consumidores construída com sucesso!"
+offsets: ## Mostra quantas mensagens há em cada partição
+	kubectl exec -n $(NS) $(BROKER) -- /opt/kafka/bin/kafka-get-offsets.sh \
+		--bootstrap-server $(BOOTSTRAP) --topic $(TOPICO)
 
-# Inicia os consumidores (réplicas do serviço, ex.: make iniciar-consumidores NUM_CONSUMIDORES=2)
-iniciar-consumidores:
-	@echo "Iniciando $(NUM_CONSUMIDORES) consumidores..."
-	@docker compose up -d --scale $(CONSUMIDOR)=$(NUM_CONSUMIDORES) $(CONSUMIDOR)
-	@echo "Consumidores iniciados com sucesso!"
+recriar-topico: ## Apaga e recria o tópico (zera os dados)
+	kubectl exec -n $(NS) $(BROKER) -- /opt/kafka/bin/kafka-topics.sh \
+		--bootstrap-server $(BOOTSTRAP) --delete --topic $(TOPICO)
+	@sleep 15
+	kubectl delete job criar-topico -n $(NS) --ignore-not-found
+	kubectl apply -f $(RENDER_DIR)/criar-topico.yaml
 
-# Para os consumidores
-parar-consumidores:
-	@echo "Parando os consumidores..."
-	@docker compose stop $(CONSUMIDOR)
-	@echo "Consumidores parados!"
+# ---------- Observação ----------
 
-# Reconstrói e reinicia os consumidores (útil após alterar o processador.py)
-reiniciar-consumidores: parar-consumidores construir-consumidores iniciar-consumidores
+status: ## Visão geral: pods, HPA e uso de recursos
+	@kubectl get pods,hpa -n $(NS)
+	@echo ""
+	@kubectl top pods -n $(NS) 2>/dev/null || echo "(metrics-server ainda coletando)"
 
-# Mostra os logs de todas as réplicas dos consumidores
-logs-consumidores:
-	@echo "Mostrando os logs dos consumidores (Ctrl+C para sair)..."
-	@docker compose logs -f --tail=100 $(CONSUMIDOR)
+grupo: ## Mostra qual consumidor lê qual partição, e o lag
+	kubectl exec -n $(NS) $(BROKER) -- /opt/kafka/bin/kafka-consumer-groups.sh \
+		--bootstrap-server $(BOOTSTRAP) --describe --group $(GRUPO)
 
-# Mostra as partições atribuídas a cada consumidor e o lag do grupo
-grupo-consumidores:
-	@echo "Grupo de consumidores: $(GRUPO_CONSUMIDORES)"
-	@docker compose exec -T kafka1 $(KAFKA_CLI)/kafka-consumer-groups.sh \
-		--bootstrap-server $(BROKER_INTERNO) \
-		--describe \
-		--group $(GRUPO_CONSUMIDORES)
+logs-consumidor: ## Acompanha os logs dos consumidores
+	kubectl logs -f -l app=consumidor -n $(NS) --prefix --tail=20
 
-# Altera o número de réplicas sem recriar as existentes (ex.: make escalar N=5)
-# O --no-recreate mantém as réplicas vivas, então o log mostra só o rebalanço
-escalar:
-	@if [ -z "$(N)" ]; then echo "Erro: informe o número de réplicas (ex.: make escalar N=5)"; exit 1; fi
-	@echo "Escalando $(CONSUMIDOR) para $(N) réplicas..."
-	@docker compose up -d --no-recreate --scale $(CONSUMIDOR)=$(N) $(CONSUMIDOR)
-	@echo "Escala ajustada!"
+rebalanceamento: ## Mostra apenas os eventos de rebalanceamento
+	kubectl logs -l app=consumidor -n $(NS) --tail=-1 --prefix | grep REBALANCO
 
-# Derruba uma réplica do consumidor para demonstrar o rebalanço
-falha-consumidor:
-	@alvo=$$(docker compose ps -q $(CONSUMIDOR) | head -1); \
-	if [ -z "$$alvo" ]; then echo "Erro: nenhuma réplica de $(CONSUMIDOR) em execução"; exit 1; fi; \
-	echo "Derrubando o consumidor $$(docker inspect -f '{{.Config.Hostname}}' $$alvo)..."; \
-	docker stop $$alvo >/dev/null; \
-	echo "Consumidor derrubado! Acompanhe com: make logs-consumidores"
+# ---------- Carga e escala ----------
 
-# Derruba um broker Kafka para demonstrar o failover (ex.: make falha-broker BROKER=kafka3)
-falha-broker:
-	@echo "Derrubando o broker $(BROKER)..."
-	@docker stop $(BROKER) >/dev/null
-	@echo "Broker derrubado! Verifique com: make health"
+carga-alta: ## Acelera os sensores para forçar o HPA a escalar
+	kubectl patch configmap fabrica-config -n $(NS) \
+		-p '{"data":{"INTERVALO_SEGUNDOS":"0.02"}}'
+	kubectl rollout restart deployment -l app=sensor -n $(NS)
 
-# Religa um broker derrubado e espera ele voltar a responder (ex.: make recuperar-broker BROKER=kafka3)
-# Os dados do broker persistem no volume, então ele volta ao cluster e ressincroniza as réplicas
-recuperar-broker:
-	@echo "Recuperando o broker $(BROKER)..."
-	@docker compose start $(BROKER) >/dev/null
-	@for i in $$(seq 1 60); do \
-		if docker compose exec -T $(BROKER) $(KAFKA_CLI)/kafka-broker-api-versions.sh --bootstrap-server $(BROKER):19092 >/dev/null 2>&1; then \
-			echo "✓ Broker $(BROKER) recuperado! Verifique com: make health"; \
-			exit 0; \
-		fi; \
-		echo "Broker $(BROKER) iniciando... ($$i/60)"; \
-		sleep 2; \
-	done; \
-	echo "✗ Tempo esgotado aguardando o broker $(BROKER)"; \
-	exit 1
+carga-normal: ## Volta os sensores ao intervalo padrão
+	kubectl patch configmap fabrica-config -n $(NS) \
+		-p '{"data":{"INTERVALO_SEGUNDOS":"$(INTERVALO_SEGUNDOS)"}}'
+	kubectl rollout restart deployment -l app=sensor -n $(NS)
+
+escalar: ## Define o número de consumidores. Uso: make escalar N=3
+	kubectl scale deployment consumidor --replicas=$(N) -n $(NS)
+
+# ---------- Testes de falha ----------
+
+falha-broker: ## Simula a queda de um broker e grava as evidências
+	./scripts/falha-broker.sh
+
+falha-consumidor: ## Simula a queda de um consumidor e grava as evidências
+	./scripts/falha-consumidor.sh
+
+.PHONY: help build push publicar render up down topico offsets recriar-topico \
+        status grupo logs-consumidor rebalanceamento carga-alta carga-normal \
+        escalar falha-broker falha-consumidor

@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: consumidor
-          image: maludu/fabrica-consumidor:v3
+          image: ${DOCKER_USER}/fabrica-consumidor:${TAG_CONSUMIDOR}
           imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:

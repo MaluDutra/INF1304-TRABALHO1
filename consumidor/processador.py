@@ -1,6 +1,5 @@
 """Processador de dados de sensores Kafka."""
 
-import asyncio
 import json
 import logging
 import os
@@ -229,7 +228,7 @@ class ConsumidorSensor:
             "consumo_energia": float(os.getenv("ENERGIA_LIMITE", "200.0")),
         }
 
-    async def run(self) -> None:
+    def run(self) -> None:
         """Escuta e processa mensagens do tópico de sensores.
 
         Executa até ser interrompido.
@@ -291,7 +290,7 @@ class ConsumidorSensor:
             self.logger.error(f"Erro ao encerrar o consumidor Kafka: {e}")
 
 
-async def main() -> None:
+def main() -> None:
     """Lê a configuração do ambiente e executa o consumidor.
 
     Variáveis: CONSUMER_ID, KAFKA_BOOTSTRAP, TOPICO_SENSORES e
@@ -300,7 +299,7 @@ async def main() -> None:
     # Lê a configuração do ambiente
     # O hostname do container é único por réplica, mesmo com --scale
     id_consumidor = os.getenv("CONSUMER_ID", f"consumidor-{socket.gethostname()}")
-    brokers_kafka = os.getenv("KAFKA_BOOTSTRAP", "kafka1:19092,kafka2:19092,kafka3:19092")
+    brokers_kafka = os.getenv("KAFKA_BOOTSTRAP", "kafka-1-0.kafka-headless:9092,kafka-2-0.kafka-headless:9092,kafka-3-0.kafka-headless:9092")
     topico_sensor = os.getenv("TOPICO_SENSORES", "dados-sensores")
     grupo_consumidor = os.getenv("GRUPO_CONSUMIDORES", "processadores")
 
@@ -321,4 +320,4 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    run(main())
