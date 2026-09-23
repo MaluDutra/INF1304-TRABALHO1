@@ -54,7 +54,15 @@ render: ## Renderiza os manifestos substituindo DOCKER_USER e as tags
 	done
 	@echo "Manifestos renderizados em $(RENDER_DIR)/"
 
-up: render ## Sobe todo o sistema no cluster
+metrics-server: ## Instala o metrics-server (necessário para o HPA no Docker Desktop)
+	kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+	@kubectl get deployment metrics-server -n kube-system -o jsonpath='{.spec.template.spec.containers[0].args}' \
+	 | grep -q kubelet-insecure-tls \
+	 || kubectl patch deployment metrics-server -n kube-system --type=json \
+	 -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+	kubectl rollout status deployment metrics-server -n kube-system --timeout=120s
+
+up: render metrics-server ## Sobe todo o sistema no cluster
 	kubectl apply -f $(RENDER_DIR)/namespace.yaml
 	kubectl apply -f $(RENDER_DIR)/configmap.yaml
 	kubectl apply -f $(RENDER_DIR)/kafka.yaml
@@ -126,6 +134,6 @@ falha-broker: ## Simula a queda de um broker e grava as evidências
 falha-consumidor: ## Simula a queda de um consumidor e grava as evidências
 	./scripts/falha-consumidor.sh
 
-.PHONY: help build push publicar render up down topico offsets recriar-topico \
+.PHONY: help build push publicar render metrics-server up down topico offsets recriar-topico \
         status grupo logs-consumidor rebalanceamento carga-alta carga-normal \
         escalar falha-broker falha-consumidor
