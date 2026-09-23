@@ -1,0 +1,35 @@
+# Job que cria o tópico de dados dos sensores.
+# Executa uma única vez e termina; as partições e o fator de
+# replicação vêm do ConfigMap, não são hard-coded aqui.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: criar-topico
+  namespace: fabrinteligente
+spec:
+  backoffLimit: 4          # tenta de novo se os brokers ainda não estiverem prontos
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: criar-topico
+          image: apache/kafka:3.8.0
+          envFrom:         # pega as variáveis do ConfigMap! que pegou do .env!
+            - configMapRef:
+                name: fabrica-config
+          command:
+            - /bin/sh
+            - -c
+            - |
+              /opt/kafka/bin/kafka-topics.sh \
+                --bootstrap-server "$KAFKA_BOOTSTRAP" \
+                --create --if-not-exists \
+                --topic "$TOPICO_SENSORES" \
+                --partitions "$PARTICOES" \
+                --replication-factor "$REPLICACAO" \
+                --config min.insync.replicas=2
+
+              echo "--- tópico criado, detalhes: ---"
+              /opt/kafka/bin/kafka-topics.sh \
+                --bootstrap-server "$KAFKA_BOOTSTRAP" \
+                --describe --topic "$TOPICO_SENSORES"

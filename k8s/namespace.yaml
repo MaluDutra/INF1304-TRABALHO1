@@ -1,0 +1,6 @@
+# Namespace que isola todos os recursos da fábrica inteligente
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fabrinteligente
+  

@@ -50,7 +50,8 @@ class ConsumidorSensor:
             "group.id": self.grupo_consumidor,
             "client.id": self.id_consumidor,
             "auto.offset.reset": "earliest",
-            "enable.auto.commit": False,  # Desabilita commit automático; faremos no on_revoke
+            "enable.auto.commit": False,  # Desabilita commit automático; faremos no on_revoke --> o commit automático dispara por tempo, a cada 5 segundos, sem saber se a mensagem foi processada 
+                                          # Commitando manualmente, possibilita controlar que só conta como lido o que de fato foi processado
             "partition.assignment.strategy": "cooperative-sticky", # Minimiza redistribuições
             # Tempo sem heartbeat até o coordenador considerar o consumidor morto
             # e disparar o rebalanço (define a velocidade do failover)
@@ -253,6 +254,11 @@ class ConsumidorSensor:
 
                         # Processa a mensagem recebida
                         self.processar_mensagem(dados_mensagem, msg)
+
+                        # Commit após o processamento: garante semântica
+                        # at-least-once (a mensagem só é marcada como lida
+                        # depois de efetivamente processada)
+                        self.consumidor.commit(message=msg, asynchronous=True)
 
                     except Exception as e:
                         self.logger.error(f"Erro ao processar mensagem: {e}")

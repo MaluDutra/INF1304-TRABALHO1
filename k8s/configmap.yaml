@@ -1,0 +1,27 @@
+apiVersion: v1
+data:
+  SESSION_TIMEOUT_MS: "10000"
+  HEARTBEAT_INTERVAL_MS: "3000"
+  MAX_POLL_INTERVAL_MS: "300000"
+  ENERGIA_LIMITE: "200.0"
+  ENERGIA_MAX: "220.0"
+  ENERGIA_MIN: "50.0"
+  GRUPO_CONSUMIDORES: processadores
+  INTERVALO_SEGUNDOS: "2"
+  KAFKA_BOOTSTRAP: kafka-1-0.kafka-headless:9092,kafka-2-0.kafka-headless:9092,kafka-3-0.kafka-headless:9092
+  PARTICOES: "3"
+  REPLICACAO: "3"
+  TEMP_LIMITE: "50.0"
+  TEMP_MAX: "55.0"
+  TEMP_MIN: "15.0"
+  TOPICO_SENSORES: dados-sensores
+  UMIDADE_LIMITE: "80.0"
+  UMIDADE_MAX: "90.0"
+  UMIDADE_MIN: "35.0"
+  VIBRACAO_LIMITE: "10.0"
+  VIBRACAO_MAX: "12.0"
+  VIBRACAO_MIN: "0.0"
+kind: ConfigMap
+metadata:
+  name: fabrica-config
+  namespace: fabrinteligente

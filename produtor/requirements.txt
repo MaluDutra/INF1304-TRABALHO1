@@ -1,2 +1,2 @@
-confluent-kafka==2.5.3
+confluent-kafka==2.15.1
 python-dotenv==1.0.1
