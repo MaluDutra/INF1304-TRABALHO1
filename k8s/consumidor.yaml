@@ -1,0 +1,43 @@
+# Processador de dados dos sensores.
+# Ao contrário dos sensores (que representam máquinas específicas),
+# os consumidores são réplicas intercambiáveis do mesmo Deployment:
+# todos pertencem ao mesmo grupo Kafka e dividem as partições entre si.
+# O número de réplicas é ajustado automaticamente pelo HPA (Horizontal Pod Autoscaler).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: consumidor
+  namespace: fabrinteligente
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: consumidor
+  template:
+    metadata:
+      labels:
+        app: consumidor
+    spec:
+      containers:
+        - name: consumidor
+          image: maludu/fabrica-consumidor:v3
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: fabrica-config
+          env:
+            # Identifica o consumidor nos logs pelo nome do pod,
+            # o que torna o rebalanceamento rastreável
+            - name: CONSUMER_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          resources:
+            # requests.cpu é obrigatório para o HPA funcionar:
+            # é sobre esse valor que ele calcula o percentual de uso
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+              cpu: "500m"

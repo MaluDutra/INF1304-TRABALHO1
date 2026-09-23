@@ -50,8 +50,13 @@ class ConsumidorSensor:
             "group.id": self.grupo_consumidor,
             "client.id": self.id_consumidor,
             "auto.offset.reset": "earliest",
-            "enable.auto.commit": False,  # Desabilita commit automático; faremos no on_revoke --> o commit automático dispara por tempo, a cada 5 segundos, sem saber se a mensagem foi processada 
-                                          # Commitando manualmente, possibilita controlar que só conta como lido o que de fato foi processado
+            
+            # Commit periódico em background, mas apenas dos offsets que o código marcou explicitamente como processados.
+            # Evita inundar o coordenador com um commit por mensagem, o que atrasava os heartbeats e causava rebalanceamentos!!!!
+            "enable.auto.commit": True,
+            "enable.auto.offset.store": False, # Desliga o registro automático de offsets, para que o commit só ocorra após o processamento da mensagem!!
+            "auto.commit.interval.ms": 5000, # Commit a cada 5s!!! mas apenas dos offsets que o código marcou explicitamente como processados!
+
             "partition.assignment.strategy": "cooperative-sticky", # Minimiza redistribuições
             # Tempo sem heartbeat até o coordenador considerar o consumidor morto
             # e disparar o rebalanço (define a velocidade do failover)
@@ -255,10 +260,8 @@ class ConsumidorSensor:
                         # Processa a mensagem recebida
                         self.processar_mensagem(dados_mensagem, msg)
 
-                        # Commit após o processamento: garante semântica
-                        # at-least-once (a mensagem só é marcada como lida
-                        # depois de efetivamente processada)
-                        self.consumidor.commit(message=msg, asynchronous=True)
+                        # Marca a mensagem como processada --> o commit em si é feito pela biblioteca a cada 5s
+                        self.consumidor.store_offsets(message=msg)
 
                     except Exception as e:
                         self.logger.error(f"Erro ao processar mensagem: {e}")

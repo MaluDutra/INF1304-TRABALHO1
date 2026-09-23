@@ -12,7 +12,7 @@ import random
 import time
 import socket
 
-from confluent_kafka import Producer
+from confluent_kafka import Producer, KafkaException
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -93,16 +93,25 @@ def main():
         while True:
             leitura = gerar_leitura(SENSOR_ID)
 
-            produtor.produce(
-                topic=TOPICO,
-                key=SENSOR_ID,  # mesma chave -> mesma partição
-                value=json.dumps(leitura),
-                callback=callback_entrega,
-            )
-            produtor.poll(0)  # dispara os callbacks pendentes
+            try:
+                produtor.produce(
+                    topic=TOPICO,
+                    key=SENSOR_ID,
+                    value=json.dumps(leitura),
+                    callback=callback_entrega,
+                )
+            except KafkaException as e:
+                # Tópico ainda não criado ou cluster indisponível:
+                # o sensor continua medindo e tenta novamente depois.
+                print(f"[{SENSOR_ID}] erro ao publicar, tentando de novo: {e}")
+            except BufferError:
+                # Fila interna cheia (broker fora do ar): aguarda espaço
+                print(f"[{SENSOR_ID}] fila cheia, aguardando...")
+                produtor.poll(1)
 
+            produtor.poll(0)
             print(f"[{SENSOR_ID}] enviado: {leitura}")
-            time.sleep(INTERVALO)
+            time.sleep(INTERVALO)      
 
     except KeyboardInterrupt:
         print(f"[{SENSOR_ID}] encerrando...")

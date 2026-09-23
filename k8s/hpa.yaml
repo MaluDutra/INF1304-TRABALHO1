@@ -1,0 +1,28 @@
+# Horizontal Pod Autoscaler do consumidor.
+# Ajusta automaticamente o número de réplicas conforme o uso de CPU.
+# O teto de 3 réplicas não é arbitrário: o tópico tem 3 partições, e
+# no Kafka cada partição é atribuída a no máximo um consumidor do
+# grupo. Uma 4ª réplica ficaria permanentemente ociosa.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: consumidor-hpa
+  namespace: fabrinteligente
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: consumidor
+  minReplicas: 1
+  maxReplicas: 3
+  behavior:
+    scaleDown:
+      # Espera 60s de calmaria antes de reduzir, evitando subir e descer repetidamente com oscilações curtas
+      stabilizationWindowSeconds: 60
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50 # Limite de uso de CPU para disparar o aumento de réplicas

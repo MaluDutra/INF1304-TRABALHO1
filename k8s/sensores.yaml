@@ -1,0 +1,262 @@
+# Sensor da máquina producao-TRN.
+# Cada sensor é um Deployment de 1 réplica: representa uma máquina
+# física específica, com identidade e setor fixos. As faixas de
+# medição e o endereço do Kafka vêm do ConfigMap.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sensor-trn
+  namespace: fabrinteligente
+  labels:
+    app: sensor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sensor
+      maquina: trn
+  template:
+    metadata:
+      labels:
+        app: sensor
+        maquina: trn
+    spec:
+      containers:
+        - name: sensor
+          image: maludu/fabrica-sensor:v2
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: fabrica-config
+          env:
+            - name: SENSOR_ID
+              value: "producao-TRN"
+            - name: SETOR
+              value: "producao"
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+
+---  
+# Sensor da máquina producao-FRS.
+# Cada sensor é um Deployment de 1 réplica: representa uma máquina
+# física específica, com identidade e setor fixos. As faixas de
+# medição e o endereço do Kafka vêm do ConfigMap.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sensor-frs
+  namespace: fabrinteligente
+  labels:
+    app: sensor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sensor
+      maquina: frs
+  template:
+    metadata:
+      labels:
+        app: sensor
+        maquina: frs
+    spec:
+      containers:
+        - name: sensor
+          image: maludu/fabrica-sensor:v2
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: fabrica-config
+          env:
+            - name: SENSOR_ID
+              value: "producao-FRS"
+            - name: SETOR
+              value: "producao"
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+
+---
+# Sensor da máquina refrigeracao-CND.
+# Cada sensor é um Deployment de 1 réplica: representa uma máquina
+# física específica, com identidade e setor fixos. As faixas de
+# medição e o endereço do Kafka vêm do ConfigMap.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sensor-cnd
+  namespace: fabrinteligente
+  labels:
+    app: sensor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sensor
+      maquina: cnd
+  template:
+    metadata:
+      labels:
+        app: sensor
+        maquina: cnd
+    spec:
+      containers:
+        - name: sensor
+          image: maludu/fabrica-sensor:v2
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: fabrica-config
+          env:
+            - name: SENSOR_ID
+              value: "refrigeracao-CND"
+            - name: SETOR
+              value: "refrigeracao"
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+
+---
+# Sensor da máquina refrigeracao-CMP.
+# Cada sensor é um Deployment de 1 réplica: representa uma máquina
+# física específica, com identidade e setor fixos. As faixas de
+# medição e o endereço do Kafka vêm do ConfigMap.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sensor-cmp
+  namespace: fabrinteligente
+  labels:
+    app: sensor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sensor
+      maquina: cmp
+  template:
+    metadata:
+      labels:
+        app: sensor
+        maquina: cmp
+    spec:
+      containers:
+        - name: sensor
+          image: maludu/fabrica-sensor:v2
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: fabrica-config
+          env:
+            - name: SENSOR_ID
+              value: "refrigeracao-CMP"
+            - name: SETOR
+              value: "refrigeracao"
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+
+---
+# Sensor da máquina empacotamento-SEL.
+# Cada sensor é um Deployment de 1 réplica: representa uma máquina
+# física específica, com identidade e setor fixos. As faixas de
+# medição e o endereço do Kafka vêm do ConfigMap.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sensor-sel
+  namespace: fabrinteligente
+  labels:
+    app: sensor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sensor
+      maquina: sel
+  template:
+    metadata:
+      labels:
+        app: sensor
+        maquina: sel
+    spec:
+      containers:
+        - name: sensor
+          image: maludu/fabrica-sensor:v2
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: fabrica-config
+          env:
+            - name: SENSOR_ID
+              value: "empacotamento-SEL"
+            - name: SETOR
+              value: "empacotamento"
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+
+---
+# Sensor da máquina empacotamento-ROT.
+# Cada sensor é um Deployment de 1 réplica: representa uma máquina
+# física específica, com identidade e setor fixos. As faixas de
+# medição e o endereço do Kafka vêm do ConfigMap.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sensor-rot
+  namespace: fabrinteligente
+  labels:
+    app: sensor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sensor
+      maquina: rot
+  template:
+    metadata:
+      labels:
+        app: sensor
+        maquina: rot
+    spec:
+      containers:
+        - name: sensor
+          image: maludu/fabrica-sensor:v2
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: fabrica-config
+          env:
+            - name: SENSOR_ID
+              value: "empacotamento-ROT"
+            - name: SETOR
+              value: "empacotamento"
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
