@@ -285,6 +285,7 @@ services:
       SESSION_TIMEOUT_MS: ${SESSION_TIMEOUT_MS}
       HEARTBEAT_INTERVAL_MS: ${HEARTBEAT_INTERVAL_MS}
       MAX_POLL_INTERVAL_MS: ${MAX_POLL_INTERVAL_MS}
+      AUTO_COMMIT_INTERVAL_MS: ${AUTO_COMMIT_INTERVAL_MS} # Intervalo de commit em background dos offsets já marcados como processados
       # Limites de perigo usados pelo processador para gerar alertas
       TEMP_LIMITE: ${TEMP_LIMITE}
       VIBRACAO_LIMITE: ${VIBRACAO_LIMITE}

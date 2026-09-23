@@ -49,14 +49,12 @@ class ConsumidorSensor:
             "group.id": self.grupo_consumidor,
             "client.id": self.id_consumidor,
             "auto.offset.reset": "earliest",
-            
             # Commit periódico em background, mas apenas dos offsets que o código marcou explicitamente como processados.
             # Evita inundar o coordenador com um commit por mensagem, o que atrasava os heartbeats e causava rebalanceamentos!!!!
             "enable.auto.commit": True,
-            "enable.auto.offset.store": False, # Desliga o registro automático de offsets, para que o commit só ocorra após o processamento da mensagem!!
-            "auto.commit.interval.ms": 5000, # Commit a cada 5s!!! mas apenas dos offsets que o código marcou explicitamente como processados!
-
-            "partition.assignment.strategy": "cooperative-sticky", # Minimiza redistribuições
+            "enable.auto.offset.store": False,  # Desliga o registro automático de offsets, para que o commit só ocorra após o processamento da mensagem!!
+            "auto.commit.interval.ms": int(os.getenv("AUTO_COMMIT_INTERVAL_MS", "5000")),  # Commit a cada 5s!!! mas apenas dos offsets que o código marcou explicitamente como processados!
+            "partition.assignment.strategy": "cooperative-sticky",  # Minimiza redistribuições
             # Tempo sem heartbeat até o coordenador considerar o consumidor morto
             # e disparar o rebalanço (define a velocidade do failover)
             "session.timeout.ms": int(os.getenv("SESSION_TIMEOUT_MS", "10000")),
@@ -120,7 +118,7 @@ class ConsumidorSensor:
         self.logger.warning(f"REBALANCO - partições REVOGADAS de {self.id_consumidor}: {ids}")
 
         try:
-            consumidor.commit(asynchronous=False)   # síncrono: tem que terminar antes de devolver
+            consumidor.commit(asynchronous=False)  # síncrono: tem que terminar antes de devolver
         except KafkaException as e:
             # KafkaError._NO_OFFSET = nada a commitar (ex.: rebalanço logo após a subida)
             if e.args[0].code() != KafkaError._NO_OFFSET:
@@ -299,7 +297,10 @@ def main() -> None:
     # Lê a configuração do ambiente
     # O hostname do container é único por réplica, mesmo com --scale
     id_consumidor = os.getenv("CONSUMER_ID", f"consumidor-{socket.gethostname()}")
-    brokers_kafka = os.getenv("KAFKA_BOOTSTRAP", "kafka-1-0.kafka-headless:9092,kafka-2-0.kafka-headless:9092,kafka-3-0.kafka-headless:9092")
+    brokers_kafka = os.getenv(
+        "KAFKA_BOOTSTRAP",
+        "kafka-1-0.kafka-headless:9092,kafka-2-0.kafka-headless:9092,kafka-3-0.kafka-headless:9092",
+    )
     topico_sensor = os.getenv("TOPICO_SENSORES", "dados-sensores")
     grupo_consumidor = os.getenv("GRUPO_CONSUMIDORES", "processadores")
 
@@ -312,7 +313,7 @@ def main() -> None:
     )
 
     try:
-        await consumidor.run()
+        consumidor.run()
     except KeyboardInterrupt:
         consumidor.logger.info("Consumidor interrompido pelo usuário")
     finally:
@@ -320,4 +321,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    run(main())
+    main()
