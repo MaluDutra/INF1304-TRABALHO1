@@ -65,7 +65,7 @@ spec:
             - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
               value: "3"
             - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
-              value: "2"
+              value: "${MIN_ISR}"
             - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
               value: "false"
             - name: KAFKA_LOG_DIRS
@@ -144,7 +144,7 @@ spec:
             - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
               value: "3"
             - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
-              value: "2"
+              value: "${MIN_ISR}"
             - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
               value: "false"
             - name: KAFKA_LOG_DIRS
@@ -223,7 +223,7 @@ spec:
             - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
               value: "3"
             - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
-              value: "2"
+              value: "${MIN_ISR}"
             - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
               value: "false"
             - name: KAFKA_LOG_DIRS

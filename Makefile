@@ -34,7 +34,7 @@ help: ## Mostra esta ajuda
 # ---------- Possíveis ajustes necessários ----------
 
 configmap: ## Regenera o ConfigMap a partir do .env
-	@grep -vE '^(#|$$|DOCKER_USER=|TAG_|KAFKA_CLUSTER_ID=)' .env \
+	@grep -vE '^(#|$$|DOCKER_USER=|TAG_|KAFKA_CLUSTER_ID=|KAFKA_IMAGEM=|MIN_ISR=|MAX_CONSUMIDORES=|TIMEOUT_CLI_MS=)' .env \
 	 | sed 's/\r$$//' > /tmp/fabrica.env
 	kubectl create configmap fabrica-config --from-env-file=/tmp/fabrica.env \
 		-n $(NS) --dry-run=client -o yaml > k8s/configmap.yaml

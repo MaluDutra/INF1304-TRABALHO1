@@ -27,7 +27,7 @@ spec:
                 --topic "$TOPICO_SENSORES" \
                 --partitions "${PARTICOES}" \
                 --replication-factor "${REPLICACAO}" \
-                --config min.insync.replicas=2
+                --config min.insync.replicas=${MIN_ISR}
 
               echo "--- tópico criado, detalhes: ---"
               /opt/kafka/bin/kafka-topics.sh \
