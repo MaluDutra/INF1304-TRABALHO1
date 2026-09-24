@@ -14,7 +14,7 @@ spec:
     kind: Deployment
     name: consumidor
   minReplicas: 1
-  maxReplicas: 3
+  maxReplicas: ${MAX_CONSUMIDORES}
   behavior:
     scaleDown:
       # Espera 60s de calmaria antes de reduzir, evitando subir e descer repetidamente com oscilações curtas

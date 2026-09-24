@@ -20,7 +20,10 @@ ARQUIVO_ALERTAS ?= alertas.jsonl
 POD_CONSUMIDOR  := kubectl get pod -l app=consumidor -n $(NS) -o jsonpath='{.items[0].metadata.name}'
 # Apenas estas variáveis são substituídas nos manifestos; as demais
 # (usadas dentro dos containers) precisam chegar intactas.
-SUBST_VARS  := '$$DOCKER_USER $$TAG_SENSOR $$TAG_CONSUMIDOR'
+SUBST_VARS  := '$$DOCKER_USER $$TAG_SENSOR $$TAG_CONSUMIDOR $$KAFKA_CLUSTER_ID \
+                $$KAFKA_IMAGEM $$PARTICOES $$REPLICACAO $$MIN_ISR $$MAX_CONSUMIDORES'
+
+TIMEOUT_CLI_MS  ?= 30000
 
 .DEFAULT_GOAL := help
 
@@ -110,7 +113,8 @@ status: ## Visão geral: pods, HPA e uso de recursos
 
 grupo: ## Mostra qual consumidor lê qual partição, e o lag
 	kubectl exec -n $(NS) $(BROKER) -- /opt/kafka/bin/kafka-consumer-groups.sh \
-		--bootstrap-server $(BOOTSTRAP) --describe --group $(GRUPO)
+		--bootstrap-server $(BOOTSTRAP) --describe --group $(GRUPO) \
+		--timeout $(TIMEOUT_CLI_MS)
 
 logs-consumidor: ## Acompanha os logs dos consumidores
 	kubectl logs -f -l app=consumidor -n $(NS) --prefix --tail=20
