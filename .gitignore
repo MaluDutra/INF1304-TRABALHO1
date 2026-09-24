@@ -221,3 +221,6 @@ __marimo__/
 
 # Kubernetes
 k8s/.rendered/
+
+# Dados persistidos copiados do cluster por "make dados" (*.log não cobre .jsonl)
+dados/

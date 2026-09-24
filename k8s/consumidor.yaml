@@ -41,3 +41,13 @@ spec:
             limits:
               memory: "128Mi"
               cpu: "500m"
+          volumeMounts:
+            # O mountPath precisa ser igual a DIR_DADOS no ConfigMap:
+            # é lá que o processador cria os arquivos de dados e de alertas
+            - name: dados
+              mountPath: /dados
+      volumes:
+        # Todas as réplicas montam o MESMO volume e gravam nos mesmos dois arquivos
+        - name: dados
+          persistentVolumeClaim:
+            claimName: dados-processados

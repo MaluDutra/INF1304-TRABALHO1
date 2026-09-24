@@ -4,6 +4,9 @@ data:
   SESSION_TIMEOUT_MS: "10000"
   HEARTBEAT_INTERVAL_MS: "3000"
   MAX_POLL_INTERVAL_MS: "300000"
+  ARQUIVO_ALERTAS: alertas.jsonl
+  ARQUIVO_DADOS: dados-processados.jsonl
+  DIR_DADOS: /dados
   ENERGIA_LIMITE: "200.0"
   ENERGIA_MAX: "220.0"
   ENERGIA_MIN: "50.0"
@@ -11,6 +14,7 @@ data:
   INTERVALO_SEGUNDOS: "2"
   KAFKA_BOOTSTRAP: kafka-1-0.kafka-headless:9092,kafka-2-0.kafka-headless:9092,kafka-3-0.kafka-headless:9092
   PARTICOES: "3"
+  PERSISTENCIA_ATIVA: "true"
   REPLICACAO: "3"
   TEMP_LIMITE: "50.0"
   TEMP_MAX: "55.0"

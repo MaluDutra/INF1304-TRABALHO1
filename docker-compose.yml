@@ -144,7 +144,7 @@ services:
     environment:
       SENSOR_ID: producao-TRN
       SETOR: producao
-      KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP}
+      KAFKA_BOOTSTRAP: "kafka1:19092,kafka2:19092,kafka3:19092"
       TOPICO_SENSORES: ${TOPICO_SENSORES}
       INTERVALO_SEGUNDOS: ${INTERVALO_SEGUNDOS}
       TEMP_MIN: ${TEMP_MIN}
@@ -167,7 +167,7 @@ services:
     environment:
       SENSOR_ID: producao-FRS
       SETOR: producao
-      KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP}
+      KAFKA_BOOTSTRAP: "kafka1:19092,kafka2:19092,kafka3:19092"
       TOPICO_SENSORES: ${TOPICO_SENSORES}
       INTERVALO_SEGUNDOS: ${INTERVALO_SEGUNDOS}
       TEMP_MIN: ${TEMP_MIN}
@@ -190,7 +190,7 @@ services:
     environment:
       SENSOR_ID: refrigeracao-CND
       SETOR: refrigeracao
-      KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP}
+      KAFKA_BOOTSTRAP: "kafka1:19092,kafka2:19092,kafka3:19092"
       TOPICO_SENSORES: ${TOPICO_SENSORES}
       INTERVALO_SEGUNDOS: ${INTERVALO_SEGUNDOS}
       TEMP_MIN: ${TEMP_MIN}
@@ -213,7 +213,7 @@ services:
     environment:
       SENSOR_ID: refrigeracao-CMP
       SETOR: refrigeracao
-      KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP}
+      KAFKA_BOOTSTRAP: "kafka1:19092,kafka2:19092,kafka3:19092"
       TOPICO_SENSORES: ${TOPICO_SENSORES}
       INTERVALO_SEGUNDOS: ${INTERVALO_SEGUNDOS}
       TEMP_MIN: ${TEMP_MIN}
@@ -236,7 +236,7 @@ services:
     environment:
       SENSOR_ID: empacotamento-SEL
       SETOR: empacotamento
-      KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP}
+      KAFKA_BOOTSTRAP: "kafka1:19092,kafka2:19092,kafka3:19092"
       TOPICO_SENSORES: ${TOPICO_SENSORES}
       INTERVALO_SEGUNDOS: ${INTERVALO_SEGUNDOS}
       TEMP_MIN: ${TEMP_MIN}
@@ -259,7 +259,7 @@ services:
     environment:
       SENSOR_ID: empacotamento-ROT
       SETOR: empacotamento
-      KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP}
+      KAFKA_BOOTSTRAP: "kafka1:19092,kafka2:19092,kafka3:19092"
       TOPICO_SENSORES: ${TOPICO_SENSORES}
       INTERVALO_SEGUNDOS: ${INTERVALO_SEGUNDOS}
       TEMP_MIN: ${TEMP_MIN}
@@ -278,7 +278,7 @@ services:
     build: ./consumidor
     depends_on: [kafka1, kafka2, kafka3]
     environment:
-      KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP} # Brokers (listener interno da rede Docker)
+      KAFKA_BOOTSTRAP: "kafka1:19092,kafka2:19092,kafka3:19092"
       TOPICO_SENSORES: ${TOPICO_SENSORES} # Tópico de sensores que o consumidor vai escutar
       GRUPO_CONSUMIDORES: ${GRUPO_CONSUMIDORES} # Grupo de consumidores para dividir as partições do tópico
       # Tempos do protocolo de grupo: o session timeout define quanto demora o failover

@@ -1,0 +1,23 @@
+# Volume onde os consumidores gravam os dados processados e os alertas.
+#
+# Um único volume é montado por TODAS as réplicas do Deployment consumidor, que
+# escrevem nos mesmos dois arquivos JSON Lines. A consistência não vem de trava:
+# vem do modo append atômico (O_APPEND) somado a uma única chamada de escrita por registro
+# — ver o cabeçalho de consumidor/persistencia.py.
+#
+# ReadWriteOnce restringe a montagem a UM NÓ, não a um pod: como o cluster tem um
+# nó só, as três réplicas montam este mesmo volume sem conflito. Num cluster com
+# vários nós seria preciso ReadWriteMany, que o provisionador padrão não oferece.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dados-processados
+  namespace: fabrinteligente
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      # Mesmo tamanho dos volumes dos brokers. Em "make carga-alta" (~300 msg/s)
+      # os arquivos crescem cerca de 5 MB/min; use "make limpar-dados" entre testes.
+      storage: 2Gi
