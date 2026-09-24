@@ -172,6 +172,9 @@ dados-resumo: dados ## Conta os registros por consumidor e por partição (evid�
 	@grep -o '"particao":[0-9]*,"offset":[0-9]*' dados/$(ARQUIVO_DADOS) \
 	 | sort | uniq -d | wc -l
 
+dashboard: ## Gera o dashboard HTML a partir dos dados ja coletados
+	python3 dashboard/gerar_dashboard.py
+
 limpar-dados: ## Esvazia os arquivos no volume para começar um teste limpo
 	@pod=$$($(POD_CONSUMIDOR)); \
 	 kubectl exec -n $(NS) $$pod -- sh -c \
@@ -203,4 +206,4 @@ falha-consumidor: ## Simula a queda de um consumidor e grava as evidências
 
 .PHONY: help build push publicar render metrics-server up down topico offsets recriar-topico \
         status grupo logs-consumidor rebalanceamento dados alertas validar-dados dados-resumo \
-        limpar-dados carga-alta carga-normal escalar falha-broker falha-consumidor
+        dashboard limpar-dados carga-alta carga-normal escalar falha-broker falha-consumidor
