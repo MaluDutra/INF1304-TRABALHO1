@@ -12,6 +12,12 @@ BOOTSTRAP   ?= kafka-1-0.kafka-headless:9092
 TOPICO      ?= $(TOPICO_SENSORES)
 GRUPO       ?= $(GRUPO_CONSUMIDORES)
 RENDER_DIR  := k8s/.rendered
+# Persistência: valores de reserva caso o .env não exista
+DIR_DADOS       ?= /dados
+ARQUIVO_DADOS   ?= dados-processados.jsonl
+ARQUIVO_ALERTAS ?= alertas.jsonl
+# Qualquer réplica serve: todas montam o mesmo volume
+POD_CONSUMIDOR  := kubectl get pod -l app=consumidor -n $(NS) -o jsonpath='{.items[0].metadata.name}'
 # Apenas estas variáveis são substituídas nos manifestos; as demais
 # (usadas dentro dos containers) precisam chegar intactas.
 SUBST_VARS  := '$$DOCKER_USER $$TAG_SENSOR $$TAG_CONSUMIDOR'
@@ -19,7 +25,7 @@ SUBST_VARS  := '$$DOCKER_USER $$TAG_SENSOR $$TAG_CONSUMIDOR'
 .DEFAULT_GOAL := help
 
 help: ## Mostra esta ajuda
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(firstword $(MAKEFILE_LIST)) \
 	 | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
 # ---------- Possíveis ajustes necessários ----------
@@ -65,6 +71,7 @@ metrics-server: ## Instala o metrics-server (necessário para o HPA no Docker De
 up: render metrics-server ## Sobe todo o sistema no cluster
 	kubectl apply -f $(RENDER_DIR)/namespace.yaml
 	kubectl apply -f $(RENDER_DIR)/configmap.yaml
+	kubectl apply -f $(RENDER_DIR)/pvc-dados.yaml
 	kubectl apply -f $(RENDER_DIR)/kafka.yaml
 	@echo "Aguardando os brokers ficarem prontos..."
 	kubectl wait --for=condition=ready pod -l app=kafka -n $(NS) --timeout=180s
@@ -111,6 +118,66 @@ logs-consumidor: ## Acompanha os logs dos consumidores
 rebalanceamento: ## Mostra apenas os eventos de rebalanceamento
 	kubectl logs -l app=consumidor -n $(NS) --tail=-1 --prefix | grep REBALANCO
 
+# ---------- Dados persistidos ----------
+
+# Várias réplicas gravam nos mesmos dois arquivos. Se o append atômico estiver
+# correto, nenhuma linha fica truncada ou misturada com a de outro consumidor:
+# é exatamente isso que este script verifica.
+define VALIDAR_PY
+import json, sys
+houve_falha = False
+for caminho in sys.argv[1:]:
+    total = ruins = 0
+    for n, linha in enumerate(open(caminho, encoding="utf-8"), 1):
+        total += 1
+        try:
+            json.loads(linha)
+        except json.JSONDecodeError as erro:
+            ruins += 1
+            if ruins <= 3:
+                print(f"   linha {n} corrompida: {erro}")
+    print(f"{caminho}: {total} linhas, {ruins} corrompidas")
+    houve_falha = houve_falha or ruins > 0
+sys.exit(1 if houve_falha else 0)
+endef
+export VALIDAR_PY
+
+dados: ## Copia os dados processados e os alertas do volume para ./dados/
+	@mkdir -p dados
+	@pod=$$($(POD_CONSUMIDOR)); \
+	 kubectl exec -n $(NS) $$pod -- cat $(DIR_DADOS)/$(ARQUIVO_DADOS)   > dados/$(ARQUIVO_DADOS); \
+	 kubectl exec -n $(NS) $$pod -- cat $(DIR_DADOS)/$(ARQUIVO_ALERTAS) > dados/$(ARQUIVO_ALERTAS)
+	@wc -l dados/$(ARQUIVO_DADOS) dados/$(ARQUIVO_ALERTAS)
+
+alertas: ## Mostra os últimos alertas gravados, sem copiar nada
+	@pod=$$($(POD_CONSUMIDOR)); \
+	 kubectl exec -n $(NS) $$pod -- tail -n 20 $(DIR_DADOS)/$(ARQUIVO_ALERTAS)
+
+validar-dados: ## Verifica que toda linha é um JSON válido (prova do append atômico)
+	@python3 -c "$$VALIDAR_PY" dados/$(ARQUIVO_DADOS) dados/$(ARQUIVO_ALERTAS)
+
+dados-resumo: dados ## Conta os registros por consumidor e por partição (evidência do balanceamento)
+	@echo ""
+	@echo "== Registros por consumidor =="
+	@grep -o '"consumidor":"[^"]*"' dados/$(ARQUIVO_DADOS) | cut -d'"' -f4 | sort | uniq -c
+	@echo ""
+	@echo "== Registros por partição =="
+	@grep -o '"particao":[0-9]*' dados/$(ARQUIVO_DADOS) | cut -d: -f2 | sort -n | uniq -c
+	@echo ""
+	@echo "== Alertas por parâmetro =="
+	@grep -o '"parametro":"[^"]*"' dados/$(ARQUIVO_ALERTAS) | cut -d'"' -f4 | sort | uniq -c
+	@echo ""
+	@echo "== Leituras duplicadas (particao,offset) =="
+	@echo "   esperadas após um rebalanço: é a semântica at-least-once em ação"
+	@grep -o '"particao":[0-9]*,"offset":[0-9]*' dados/$(ARQUIVO_DADOS) \
+	 | sort | uniq -d | wc -l
+
+limpar-dados: ## Esvazia os arquivos no volume para começar um teste limpo
+	@pod=$$($(POD_CONSUMIDOR)); \
+	 kubectl exec -n $(NS) $$pod -- sh -c \
+	   ': > $(DIR_DADOS)/$(ARQUIVO_DADOS); : > $(DIR_DADOS)/$(ARQUIVO_ALERTAS)'
+	@echo "Arquivos de dados e de alertas esvaziados"
+
 # ---------- Carga e escala ----------
 
 carga-alta: ## Acelera os sensores para forçar o HPA a escalar
@@ -135,5 +202,5 @@ falha-consumidor: ## Simula a queda de um consumidor e grava as evidências
 	./scripts/falha-consumidor.sh
 
 .PHONY: help build push publicar render metrics-server up down topico offsets recriar-topico \
-        status grupo logs-consumidor rebalanceamento carga-alta carga-normal \
-        escalar falha-broker falha-consumidor
+        status grupo logs-consumidor rebalanceamento dados alertas validar-dados dados-resumo \
+        limpar-dados carga-alta carga-normal escalar falha-broker falha-consumidor
