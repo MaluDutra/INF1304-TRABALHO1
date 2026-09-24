@@ -9,6 +9,7 @@ from datetime import datetime
 from types import FrameType
 
 from confluent_kafka import Consumer, KafkaError, KafkaException, Message, TopicPartition
+from persistencia import RepositorioJsonl
 
 
 class ConsumidorSensor:
@@ -42,6 +43,7 @@ class ConsumidorSensor:
         self.grupo_consumidor = grupo_consumidor
         self.logger = self._configurar_logger()
         self.rodando = False
+        self.repositorio = self._configurar_persistencia()
 
         # Configuração do consumidor Kafka
         consumidor_config = {
@@ -91,6 +93,28 @@ class ConsumidorSensor:
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         )
         return logging.getLogger(self.id_consumidor)
+
+    def _configurar_persistencia(self) -> RepositorioJsonl | None:
+        """Cria o repositório que grava as leituras e os alertas em arquivo.
+
+        O diretório configurado em DIR_DADOS é o ponto de montagem do volume
+        compartilhado por todas as réplicas do consumidor.
+
+        Returns:
+            Repositório pronto para gravar, ou None se PERSISTENCIA_ATIVA estiver
+            desligada (útil para rodar o consumidor sem volume montado).
+        """
+        if os.getenv("PERSISTENCIA_ATIVA", "true").lower() != "true":
+            self.logger.warning("Persistência desativada: os dados não serão gravados em arquivo")
+            return None
+
+        return RepositorioJsonl(
+            diretorio=os.getenv("DIR_DADOS", "/dados"),
+            arquivo_dados=os.getenv("ARQUIVO_DADOS", "dados-processados.jsonl"),
+            arquivo_alertas=os.getenv("ARQUIVO_ALERTAS", "alertas.jsonl"),
+            id_consumidor=self.id_consumidor,
+            logger=self.logger,
+        )
 
     def on_assign(self, consumidor: Consumer, particoes: list[TopicPartition]) -> None:
         """Callback disparado quando o coordenador atribui partições a este consumidor.
@@ -158,9 +182,11 @@ class ConsumidorSensor:
         consumo_energia = dados_mensagem.get("consumo_energia")
 
         # Verifica se algum parâmetro excede os limites de perigo
-        alerta = self._detectar_perigo(dados_mensagem)
-        if alerta:
-            self.logger.warning(alerta)
+        alertas = self._detectar_perigo(dados_mensagem)
+        if alertas:
+            self.logger.warning(
+                "\n".join(self._formatar_alerta(a, dados_mensagem) for a in alertas)
+            )
 
         # Logando os dados recebidos
         particao_str = f"[particao {mensagem.partition()}]" if mensagem else ""
@@ -170,6 +196,14 @@ class ConsumidorSensor:
             f"Vibração: {vibracao}, Umidade: {umidade}, "
             f"Consumo de Energia: {consumo_energia} {particao_str}"
         )
+
+        # Grava em arquivo antes de o offset ser marcado como processado (ver run()).
+        # Se a gravação falhar, a exceção sobe e o offset não avança, de modo que a
+        # mensagem será reprocessada: é a semântica at-least-once.
+        if self.repositorio:
+            self.repositorio.gravar_leitura(dados_mensagem, mensagem, bool(alertas))
+            if alertas:
+                self.repositorio.gravar_alertas(alertas, dados_mensagem, mensagem)
 
     @staticmethod
     def _formatar_timestamp(timestamp: float | None) -> str:
@@ -187,31 +221,49 @@ class ConsumidorSensor:
         except (TypeError, ValueError, OverflowError, OSError):
             return str(timestamp)
 
-    def _detectar_perigo(self, dados_mensagem: dict) -> str | None:
-        """Detecta se algum parâmetro do sensor excede os limites de perigo.
+    def _detectar_perigo(self, dados_mensagem: dict) -> list[dict]:
+        """Detecta quais parâmetros do sensor excedem os limites de perigo.
 
         Args:
             dados_mensagem: Dicionário contendo os dados da mensagem.
 
         Returns:
-            Mensagem de alerta se algum parâmetro exceder o limite, ou None caso contrário.
+            Uma entrada por parâmetro violado, contendo parametro, valor e limite.
+            Lista vazia se a leitura estiver dentro de todos os limites.
         """
         limites = self._limites_perigosos()
-        alerta = []
+        alertas = []
 
         # Verifica cada parâmetro contra seu limite
         for parametro, limite in limites.items():
             if dados_mensagem.get(parametro, 0) > limite:
-                valor = dados_mensagem.get(parametro)
-                sensor_id = dados_mensagem.get("sensor_id")
-                setor = dados_mensagem.get("setor")
-                timestamp = self._formatar_timestamp(dados_mensagem.get("timestamp"))
-                alerta.append(
-                    f"ALERTA: Sensor {sensor_id} no setor {setor} excedeu o limite "
-                    f"de {parametro}. Valor: {valor}, Limite: {limite}, "
-                    f"Timestamp: {timestamp}."
+                alertas.append(
+                    {
+                        "parametro": parametro,
+                        "valor": dados_mensagem.get(parametro),
+                        "limite": limite,
+                    }
                 )
-        return "\n".join(alerta) if alerta else None
+        return alertas
+
+    def _formatar_alerta(self, alerta: dict, dados_mensagem: dict) -> str:
+        """Monta a frase usada para registrar um alerta no log.
+
+        Args:
+            alerta: Violação detectada, contendo parametro, valor e limite.
+            dados_mensagem: Dicionário contendo os dados da mensagem.
+
+        Returns:
+            Frase descrevendo o sensor, o parâmetro violado e o limite excedido.
+        """
+        sensor_id = dados_mensagem.get("sensor_id")
+        setor = dados_mensagem.get("setor")
+        timestamp = self._formatar_timestamp(dados_mensagem.get("timestamp"))
+        return (
+            f"ALERTA: Sensor {sensor_id} no setor {setor} excedeu o limite "
+            f"de {alerta['parametro']}. Valor: {alerta['valor']}, "
+            f"Limite: {alerta['limite']}, Timestamp: {timestamp}."
+        )
 
     def _limites_perigosos(self) -> dict:
         """Retorna os limites de perigo para cada parâmetro do sensor.
@@ -280,12 +332,15 @@ class ConsumidorSensor:
         self.rodando = False
 
     def cleanup(self) -> None:
-        """Libera recursos do consumidor Kafka."""
+        """Libera recursos do consumidor Kafka e fecha os arquivos de persistência."""
         try:
             self.consumidor.close()
             self.logger.info("Consumidor Kafka encerrado com sucesso")
         except Exception as e:
             self.logger.error(f"Erro ao encerrar o consumidor Kafka: {e}")
+
+        if self.repositorio:
+            self.repositorio.fechar()
 
 
 def main() -> None:
