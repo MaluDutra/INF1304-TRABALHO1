@@ -116,6 +116,9 @@ grupo: ## Mostra qual consumidor lê qual partição, e o lag
 		--bootstrap-server $(BOOTSTRAP) --describe --group $(GRUPO) \
 		--timeout $(TIMEOUT_CLI_MS)
 
+logs-sensores: ## Acompanha os logs dos sensores
+	kubectl logs -f -l app=sensor -n $(NS) --prefix --tail=20 --max-log-requests=10
+
 logs-consumidor: ## Acompanha os logs dos consumidores
 	kubectl logs -f -l app=consumidor -n $(NS) --prefix --tail=20
 
@@ -200,6 +203,9 @@ carga-normal: ## Volta os sensores ao intervalo padrão
 escalar: ## Define o número de consumidores. Uso: make escalar N=3
 	kubectl scale deployment consumidor --replicas=$(N) -n $(NS)
 
+watch-hpa: ## Acompanha o HPA escalando os consumidores em tempo real
+	watch -n 2 'kubectl get hpa,pods -n $(NS) -l app=consumidor'
+
 # ---------- Testes de falha ----------
 
 falha-broker: ## Simula a queda de um broker e grava as evidências
@@ -209,5 +215,6 @@ falha-consumidor: ## Simula a queda de um consumidor e grava as evidências
 	./scripts/falha-consumidor.sh
 
 .PHONY: help build push publicar render metrics-server up down topico offsets recriar-topico \
-        status grupo logs-consumidor rebalanceamento dados alertas validar-dados dados-resumo \
-        dashboard limpar-dados carga-alta carga-normal escalar falha-broker falha-consumidor
+        status grupo logs-sensores logs-consumidor rebalanceamento dados alertas \
+        validar-dados dados-resumo dashboard limpar-dados carga-alta carga-normal escalar \
+        watch-hpa falha-broker falha-consumidor
