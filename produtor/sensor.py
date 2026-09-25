@@ -6,6 +6,7 @@ energia e umidade) e publica no tópico Kafka configurado, como produtor.
 """
 
 import json
+import logging
 import os
 import random
 import socket
@@ -25,6 +26,14 @@ INTERVALO = float(os.environ.get("INTERVALO_SEGUNDOS", "2"))
 
 SENSOR_ID = os.environ.get("SENSOR_ID", socket.gethostname())
 SETOR = os.environ["SETOR"]  # setor fixo da máquina
+
+# O nível de log pode ser configurado via variável de ambiente LOG_LEVEL
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(
+    level=getattr(logging, LOG_LEVEL, logging.INFO),
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(SENSOR_ID)
 
 # Faixas de simulação: definem os valores mínimos e máximos que o
 # sensor pode reportar.
@@ -71,9 +80,9 @@ def callback_entrega(erro: KafkaError | None, msg: Message) -> None:
         msg: A mensagem original que foi enviada.
     """
     if erro is not None:
-        print(f"[ERRO] Falha ao entregar mensagem: {erro}")
+        logger.error(f"Falha ao entregar mensagem: {erro}")
     else:
-        print(f"[OK] {msg.topic()} partição={msg.partition()} offset={msg.offset()}")
+        logger.info(f"{msg.topic()} partição={msg.partition()} offset={msg.offset()}")
 
 
 def main() -> None:
@@ -89,7 +98,7 @@ def main() -> None:
         }
     )
 
-    print(f"[{SENSOR_ID}] iniciando, enviando para '{TOPICO}' a cada {INTERVALO}s")
+    logger.info(f"[{SENSOR_ID}] iniciando, enviando para '{TOPICO}' a cada {INTERVALO}s")
 
     try:
         while True:
@@ -105,18 +114,18 @@ def main() -> None:
             except KafkaException as e:
                 # Tópico ainda não criado ou cluster indisponível:
                 # o sensor continua medindo e tenta novamente depois.
-                print(f"[{SENSOR_ID}] erro ao publicar, tentando de novo: {e}")
+                logger.error(f"[{SENSOR_ID}] erro ao publicar, tentando de novo: {e}")
             except BufferError:
                 # Fila interna cheia (broker fora do ar): aguarda espaço
-                print(f"[{SENSOR_ID}] fila cheia, aguardando...")
+                logger.warning("[{SENSOR_ID}] fila cheia, aguardando...")
                 produtor.poll(1)
 
             produtor.poll(0)
-            print(f"[{SENSOR_ID}] enviado: {leitura}")
+            logger.info(f"[{SENSOR_ID}] enviado: {leitura}")
             time.sleep(INTERVALO)
 
     except KeyboardInterrupt:
-        print(f"[{SENSOR_ID}] encerrando...")
+        logger.info("[{SENSOR_ID}] encerrando...")
     finally:
         produtor.flush()  # garante que tudo que estava na fila é enviado
 
