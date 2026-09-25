@@ -51,12 +51,17 @@ class ConsumidorSensor:
             "group.id": self.grupo_consumidor,
             "client.id": self.id_consumidor,
             "auto.offset.reset": "earliest",
-            # Commit periódico em background, mas apenas dos offsets que o código marcou explicitamente como processados.
-            # Evita inundar o coordenador com um commit por mensagem, o que atrasava os heartbeats e causava rebalanceamentos!!!!
+            # Commit periódico em background, mas apenas dos offsets que o código
+            # marcou explicitamente como processados. Evita inundar o coordenador
+            # com um commit por mensagem, o que atrasava os heartbeats e acabava
+            # provocando rebalanceamentos.
             "enable.auto.commit": True,
-            "enable.auto.offset.store": False,  # Desliga o registro automático de offsets, para que o commit só ocorra após o processamento da mensagem!!
-            "auto.commit.interval.ms": int(os.getenv("AUTO_COMMIT_INTERVAL_MS", "5000")),  # Commit a cada 5s!!! mas apenas dos offsets que o código marcou explicitamente como processados!
-            "partition.assignment.strategy": "cooperative-sticky",  # Minimiza redistribuições
+            # Desliga o registro automático de offsets
+            "enable.auto.offset.store": False,
+            "auto.commit.interval.ms": int(os.getenv("AUTO_COMMIT_INTERVAL_MS", "5000")),
+            # Minimiza redistribuições: só as partições que mudam de dono são
+            # revogadas, as demais seguem sendo consumidas durante o rebalanço.
+            "partition.assignment.strategy": "cooperative-sticky",
             # Tempo sem heartbeat até o coordenador considerar o consumidor morto
             # e disparar o rebalanço (define a velocidade do failover)
             "session.timeout.ms": int(os.getenv("SESSION_TIMEOUT_MS", "10000")),
@@ -309,7 +314,8 @@ class ConsumidorSensor:
                         # Processa a mensagem recebida
                         self.processar_mensagem(dados_mensagem, msg)
 
-                        # Marca a mensagem como processada --> o commit em si é feito pela biblioteca a cada 5s
+                        # Marca a mensagem como processada --> o commit
+                        # em si é feito pela biblioteca a cada 5s
                         self.consumidor.store_offsets(message=msg)
 
                     except Exception as e:

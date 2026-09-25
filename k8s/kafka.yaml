@@ -37,12 +37,12 @@ spec:
     spec:
       containers:
         - name: kafka
-          image: apache/kafka:3.8.0
+          image: ${KAFKA_IMAGEM}
           env:
             - name: KAFKA_NODE_ID
               value: "1"
             - name: CLUSTER_ID
-              value: "MkU3OEVBNTcwNTJENDM2Qk"
+              value: "${KAFKA_CLUSTER_ID}"
             # Limita a JVM para caber na memória do laptop
             - name: KAFKA_HEAP_OPTS
               value: "-Xms256M -Xmx512M"
@@ -65,7 +65,7 @@ spec:
             - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
               value: "3"
             - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
-              value: "2"
+              value: "${MIN_ISR}"
             - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
               value: "false"
             - name: KAFKA_LOG_DIRS
@@ -116,12 +116,12 @@ spec:
     spec:
       containers:
         - name: kafka
-          image: apache/kafka:3.8.0
+          image: ${KAFKA_IMAGEM}
           env:
             - name: KAFKA_NODE_ID
               value: "2"
             - name: CLUSTER_ID
-              value: "MkU3OEVBNTcwNTJENDM2Qk"
+              value: "${KAFKA_CLUSTER_ID}"
             # Limita a JVM para caber na memória do laptop
             - name: KAFKA_HEAP_OPTS
               value: "-Xms256M -Xmx512M"
@@ -144,7 +144,7 @@ spec:
             - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
               value: "3"
             - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
-              value: "2"
+              value: "${MIN_ISR}"
             - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
               value: "false"
             - name: KAFKA_LOG_DIRS
@@ -195,12 +195,12 @@ spec:
     spec:
       containers:
         - name: kafka
-          image: apache/kafka:3.8.0
+          image: ${KAFKA_IMAGEM}
           env:
             - name: KAFKA_NODE_ID
               value: "3"
             - name: CLUSTER_ID
-              value: "MkU3OEVBNTcwNTJENDM2Qk"
+              value: "${KAFKA_CLUSTER_ID}"
             # Limita a JVM para caber na memória do laptop
             - name: KAFKA_HEAP_OPTS
               value: "-Xms256M -Xmx512M"
@@ -223,7 +223,7 @@ spec:
             - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
               value: "3"
             - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
-              value: "2"
+              value: "${MIN_ISR}"
             - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
               value: "false"
             - name: KAFKA_LOG_DIRS

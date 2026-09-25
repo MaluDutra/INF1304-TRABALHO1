@@ -19,7 +19,10 @@ NAMESPACE="${NAMESPACE:-fabrinteligente}"
 GRUPO="${GRUPO_CONSUMIDORES:-processadores}"
 BOOTSTRAP="${KAFKA_BOOTSTRAP:-kafka-1-0.kafka-headless:9092}"
 BROKER="kafka-1-0"
-REPLICAS_TESTE=3
+REPLICAS_TESTE="${MAX_CONSUMIDORES:-3}"
+# O padrao de 5s da kafka-consumer-groups.sh estoura antes de encontrar o
+# coordenador: a CLI sobe uma JVM dentro do broker e disputa a CPU dele.
+TIMEOUT_CLI="${TIMEOUT_CLI_MS:-30000}"
 
 CARIMBO=$(date +%Y%m%d-%H%M%S)
 SAIDA="logs/falha-consumidor-${CARIMBO}.log"
@@ -34,7 +37,8 @@ descrever_grupo() {
     kubectl exec -n "$NAMESPACE" "$BROKER" -- \
         /opt/kafka/bin/kafka-consumer-groups.sh \
         --bootstrap-server "$BOOTSTRAP" \
-        --describe --group "$GRUPO" 2>&1 | tee -a "$SAIDA"
+        --describe --group "$GRUPO" \
+        --timeout "$TIMEOUT_CLI" 2>&1 | tee -a "$SAIDA"
 }
 
 registrar "=========================================================="
@@ -69,7 +73,16 @@ VITIMA=$(kubectl get pods -n "$NAMESPACE" -l app=consumidor \
 
 registrar ""
 registrar "--- 3. DERRUBANDO O CONSUMIDOR $VITIMA ---"
+
+# A vitima emite REVOGADAS enquanto trata o SIGTERM, ou seja, depois do delete.
+LOG_VITIMA=$(mktemp)
+timeout 120 kubectl logs -f "$VITIMA" -n "$NAMESPACE" --tail=-1 > "$LOG_VITIMA" 2>/dev/null &
+SEGUIDOR=$!
+sleep 2
+
 kubectl delete pod "$VITIMA" -n "$NAMESPACE" 2>&1 | tee -a "$SAIDA"
+wait "$SEGUIDOR" 2>/dev/null || true
+registrar "(capturados $(grep -c REBALANCO "$LOG_VITIMA" || true) eventos de rebalanceamento da vitima antes de ela sair)"
 
 registrar ""
 registrar "Aguardando o coordenador detectar e redistribuir (20s)..."
@@ -99,10 +112,17 @@ registrar "--- 7. EVENTOS DE REBALANCEAMENTO NOS LOGS ---"
 registrar "ATRIBUIDAS = recebeu particoes"
 registrar "REVOGADAS  = devolveu de forma ordenada (saida planejada)"
 registrar "PERDIDAS   = perdeu sem aviso (sessao expirou)"
+registrar "Cada linha mostra o que mudou e, depois da seta, a atribuicao"
+registrar "completa daquele consumidor logo apos o evento."
 registrar ""
-kubectl logs -l app=consumidor -n "$NAMESPACE" --tail=-1 --prefix \
-    2>/dev/null | grep REBALANCO | tee -a "$SAIDA" || \
-    registrar "(nenhum evento encontrado; os pods podem ter sido recriados)"
+# Junta o que a vitima registrou antes de morrer com o que os sobreviventes
+# registraram, em ordem cronologica.
+{
+    sed "s|^|[pod/$VITIMA] |" "$LOG_VITIMA"
+    kubectl logs -l app=consumidor -n "$NAMESPACE" --tail=-1 --prefix 2>/dev/null
+} | grep REBALANCO | sort -k2,3 | tee -a "$SAIDA" || \
+    registrar "(nenhum evento encontrado)"
+rm -f "$LOG_VITIMA"
 
 registrar ""
 registrar "Evidencias salvas em: $SAIDA"
