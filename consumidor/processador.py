@@ -124,27 +124,53 @@ class ConsumidorSensor:
     def on_assign(self, consumidor: Consumer, particoes: list[TopicPartition]) -> None:
         """Callback disparado quando o coordenador atribui partições a este consumidor.
 
+        Com a estratégia cooperative-sticky, `particoes` traz só as partições NOVAS
+        desta rodada, não a atribuição completa. O rebalanço cooperativo ocorre em
+        duas rodadas: na primeira, as partições que vão mudar de dono ainda estão
+        com o dono antigo, e por isso todos recebem uma lista vazia; na segunda,
+        depois que o dono antigo as revogou, elas chegam ao novo dono.
+
         Apenas registra o evento no log; a atribuição em si é feita pela biblioteca.
 
         Args:
             consumidor: Instância do consumidor Kafka que recebeu as partições.
-            particoes: Partições atribuídas a este consumidor.
+            particoes: Partições adicionadas a este consumidor nesta rodada.
         """
-        ids = sorted(p.partition for p in particoes)
+        novas = {p.partition for p in particoes}
+        # A biblioteca só aplica a atribuição depois que este callback retorna,
+        # então assignment() ainda não inclui as partições novas
+        atual = {p.partition for p in consumidor.assignment()} | novas
+
+        if not novas:
+            # Primeira rodada do rebalanço cooperativo, ou consumidor que não mudou
+            self.logger.debug(
+                f"REBALANCO - nenhuma partição nova para {self.id_consumidor} nesta rodada "
+                f"| partições atuais: {sorted(atual)}"
+            )
+            return
+
         self.logger.info(
-            f"REBALANCO - partições ATRIBUÍDAS a {self.id_consumidor} "
-            f"(member.id={consumidor.memberid()}): {ids}"
+            f"REBALANCO - partições ATRIBUÍDAS a {self.id_consumidor}: {sorted(novas)} "
+            f"| partições atuais: {sorted(atual)}"
         )
 
     def on_revoke(self, consumidor: Consumer, particoes: list[TopicPartition]) -> None:
         """Callback disparado antes de este consumidor perder partições no rebalanço.
 
+        Com cooperative-sticky, só as partições que mudam de dono são revogadas;
+        as demais continuam sendo consumidas.
+
         Args:
             consumidor: Instância do consumidor Kafka que perderá as partições.
             particoes: Partições que estão sendo revogadas.
         """
-        ids = sorted(p.partition for p in particoes)
-        self.logger.warning(f"REBALANCO - partições REVOGADAS de {self.id_consumidor}: {ids}")
+        revogadas = {p.partition for p in particoes}
+        # A revogação também só é aplicada depois que este callback retorna
+        restantes = {p.partition for p in consumidor.assignment()} - revogadas
+        self.logger.warning(
+            f"REBALANCO - partições REVOGADAS de {self.id_consumidor}: {sorted(revogadas)} "
+            f"| partições atuais: {sorted(restantes)}"
+        )
 
         try:
             consumidor.commit(asynchronous=False)  # síncrono: tem que terminar antes de devolver
@@ -163,8 +189,12 @@ class ConsumidorSensor:
             consumidor: Instância do consumidor Kafka que perdeu as partições.
             particoes: Partições perdidas.
         """
-        ids = sorted(p.partition for p in particoes)
-        self.logger.error(f"REBALANCO - partições PERDIDAS por {self.id_consumidor}: {ids}")
+        perdidas = {p.partition for p in particoes}
+        restantes = {p.partition for p in consumidor.assignment()} - perdidas
+        self.logger.error(
+            f"REBALANCO - partições PERDIDAS por {self.id_consumidor}: {sorted(perdidas)} "
+            f"| partições atuais: {sorted(restantes)}"
+        )
 
     def _signal_handler(self, signum: int, frame: FrameType | None) -> None:
         """Handle shutdown signals."""
