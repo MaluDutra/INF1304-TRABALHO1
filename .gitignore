@@ -57,7 +57,6 @@ cover/
 *.pot
 
 # Django stuff:
-*.log
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
@@ -221,6 +220,3 @@ __marimo__/
 
 # Kubernetes
 k8s/.rendered/
-
-# Dados persistidos copiados do cluster por "make dados" (*.log não cobre .jsonl)
-dados/
