@@ -334,7 +334,7 @@ def _lag_por_particao(namespace: str, broker: str) -> list[dict]:
                     "offset": campos[3],
                     "fim": campos[4],
                     "lag": campos[5],
-                    "consumidor": campos[6],
+                    "consumidor": campos[8],
                 }
             )
         except (ValueError, IndexError):

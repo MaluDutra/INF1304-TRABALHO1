@@ -1,0 +1,68 @@
+==========================================================
+ TESTE DE FALHA DE CONSUMIDOR - Fri Sep 25 20:42:10 -03 2026
+==========================================================
+
+--- 1. PREPARANDO O CENARIO: 3 consumidores ---
+O HPA pode ter reduzido as replicas; forcamos o numero
+necessario para que haja redistribuicao entre pares.
+deployment.apps/consumidor scaled
+Waiting for deployment "consumidor" rollout to finish: 1 of 3 updated replicas are available...
+Waiting for deployment "consumidor" rollout to finish: 2 of 3 updated replicas are available...
+deployment "consumidor" successfully rolled out
+
+Aguardando o rebalanceamento inicial estabilizar (25s)...
+
+--- 2. ESTADO INICIAL ---
+Esperado: 3 CONSUMER-ID distintos, um por particao.
+
+
+GROUP           TOPIC           PARTITION  CURRENT-OFFSET  LOG-END-OFFSET  LAG             CONSUMER-ID                                                      HOST            CLIENT-ID
+processadores   dados-sensores  1          1916            1916            0               consumidor-748d5c9d97-fw2f8-902c3c97-f8c3-43ff-bf01-da2ba2582e7b /10.244.0.215   consumidor-748d5c9d97-fw2f8
+processadores   dados-sensores  2          1914            1916            2               consumidor-748d5c9d97-s5cmj-237f672f-e012-474d-87c7-b5d61824eb0d /10.244.0.212   consumidor-748d5c9d97-s5cmj
+processadores   dados-sensores  0          1916            1916            0               consumidor-748d5c9d97-pr84r-5f0a2a8d-841a-4cdf-bd4c-390166c3b22f /10.244.0.214   consumidor-748d5c9d97-pr84r
+NAME                          READY   STATUS    RESTARTS   AGE
+consumidor-748d5c9d97-fw2f8   1/1     Running   0          32s
+consumidor-748d5c9d97-pr84r   1/1     Running   0          32s
+consumidor-748d5c9d97-s5cmj   1/1     Running   0          32m
+
+--- 3. DERRUBANDO O CONSUMIDOR consumidor-748d5c9d97-fw2f8 ---
+pod "consumidor-748d5c9d97-fw2f8" deleted from fabrinteligente namespace
+(capturados 2 eventos de rebalanceamento da vitima antes de ela sair)
+
+Aguardando o coordenador detectar e redistribuir (20s)...
+
+--- 4. ESTADO APOS A FALHA ---
+Esperado: as particoes do consumidor removido aparecem sob
+os CONSUMER-ID restantes. Nenhuma particao fica orfa.
+
+
+GROUP           TOPIC           PARTITION  CURRENT-OFFSET  LOG-END-OFFSET  LAG             CONSUMER-ID                                                      HOST            CLIENT-ID
+processadores   dados-sensores  1          1938            1944            6               consumidor-748d5c9d97-l8kxp-d6226b29-66b0-4443-9720-e28393be90c1 /10.244.0.216   consumidor-748d5c9d97-l8kxp
+processadores   dados-sensores  2          1940            1944            4               consumidor-748d5c9d97-s5cmj-237f672f-e012-474d-87c7-b5d61824eb0d /10.244.0.212   consumidor-748d5c9d97-s5cmj
+processadores   dados-sensores  0          1940            1944            4               consumidor-748d5c9d97-pr84r-5f0a2a8d-841a-4cdf-bd4c-390166c3b22f /10.244.0.214   consumidor-748d5c9d97-pr84r
+--- 5. AGUARDANDO O KUBERNETES RECRIAR O POD ---
+deployment "consumidor" successfully rolled out
+
+--- 6. ESTADO FINAL ---
+Esperado: novamente 3 consumidores, um por particao.
+
+
+GROUP           TOPIC           PARTITION  CURRENT-OFFSET  LOG-END-OFFSET  LAG             CONSUMER-ID                                                      HOST            CLIENT-ID
+processadores   dados-sensores  1          1968            1972            4               consumidor-748d5c9d97-l8kxp-d6226b29-66b0-4443-9720-e28393be90c1 /10.244.0.216   consumidor-748d5c9d97-l8kxp
+processadores   dados-sensores  2          1970            1972            2               consumidor-748d5c9d97-s5cmj-237f672f-e012-474d-87c7-b5d61824eb0d /10.244.0.212   consumidor-748d5c9d97-s5cmj
+processadores   dados-sensores  0          1970            1972            2               consumidor-748d5c9d97-pr84r-5f0a2a8d-841a-4cdf-bd4c-390166c3b22f /10.244.0.214   consumidor-748d5c9d97-pr84r
+--- 7. EVENTOS DE REBALANCEAMENTO NOS LOGS ---
+ATRIBUIDAS = recebeu particoes
+REVOGADAS  = devolveu de forma ordenada (saida planejada)
+PERDIDAS   = perdeu sem aviso (sessao expirou)
+Cada linha mostra o que mudou e, depois da seta, a atribuicao
+completa daquele consumidor logo apos o evento.
+
+[pod/consumidor-748d5c9d97-s5cmj/consumidor] 2026-09-25 23:10:51,412 - consumidor-748d5c9d97-s5cmj - INFO - REBALANCO - partições ATRIBUÍDAS a consumidor-748d5c9d97-s5cmj: [0, 1, 2] | partições atuais: [0, 1, 2]
+[pod/consumidor-748d5c9d97-s5cmj/consumidor] 2026-09-25 23:42:13,261 - consumidor-748d5c9d97-s5cmj - WARNING - REBALANCO - partições REVOGADAS de consumidor-748d5c9d97-s5cmj: [0, 1] | partições atuais: [2]
+[pod/consumidor-748d5c9d97-fw2f8] 2026-09-25 23:42:16,267 - consumidor-748d5c9d97-fw2f8 - INFO - REBALANCO - partições ATRIBUÍDAS a consumidor-748d5c9d97-fw2f8: [1] | partições atuais: [1]
+[pod/consumidor-748d5c9d97-pr84r/consumidor] 2026-09-25 23:42:16,267 - consumidor-748d5c9d97-pr84r - INFO - REBALANCO - partições ATRIBUÍDAS a consumidor-748d5c9d97-pr84r: [0] | partições atuais: [0]
+[pod/consumidor-748d5c9d97-fw2f8] 2026-09-25 23:42:45,220 - consumidor-748d5c9d97-fw2f8 - WARNING - REBALANCO - partições REVOGADAS de consumidor-748d5c9d97-fw2f8: [1] | partições atuais: []
+[pod/consumidor-748d5c9d97-l8kxp/consumidor] 2026-09-25 23:42:46,445 - consumidor-748d5c9d97-l8kxp - INFO - REBALANCO - partições ATRIBUÍDAS a consumidor-748d5c9d97-l8kxp: [1] | partições atuais: [1]
+
+Evidencias salvas em: logs/falha-consumidor-20260925-204210.log

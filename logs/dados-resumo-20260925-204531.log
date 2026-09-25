@@ -1,0 +1,33 @@
+==========================================================
+ DADOS PERSISTIDOS - Fri Sep 25 20:45:31 -03 2026
+==========================================================
+
+--- make dados-resumo ---
+  1152 dados/dados-processados.jsonl
+   680 dados/alertas.jsonl
+  1832 total
+
+== Registros por consumidor ==
+     31 consumidor-748d5c9d97-fw2f8
+     78 consumidor-748d5c9d97-l8kxp
+    109 consumidor-748d5c9d97-pr84r
+    934 consumidor-748d5c9d97-s5cmj
+
+== Registros por partição ==
+    384 0
+    384 1
+    384 2
+
+== Alertas por parâmetro ==
+    135 consumo_energia
+    159 temperatura
+    205 umidade
+    181 vibracao
+
+== Leituras duplicadas (particao,offset) ==
+   esperadas após um rebalanço: é a semântica at-least-once em ação
+0
+
+--- make validar-dados ---
+dados/dados-processados.jsonl: 1152 linhas, 0 corrompidas
+dados/alertas.jsonl: 680 linhas, 0 corrompidas

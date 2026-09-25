@@ -1,0 +1,22 @@
+==========================================================
+ REBALANCEAMENTO APOS O SCALE-IN DO HPA - Fri Sep 25 20:44:36 -03 2026
+ O HPA reduziu o Deployment de 3 para 1 consumidor as 20:44:03
+ (CPU em 2% contra alvo de 50%). O sobrevivente deve assumir
+ as particoes dos consumidores removidos.
+==========================================================
+
+--- make rebalanceamento ---
+kubectl logs -l app=consumidor -n fabrinteligente --tail=-1 --prefix | grep REBALANCO
+[pod/consumidor-748d5c9d97-s5cmj/consumidor] 2026-09-25 23:10:51,412 - consumidor-748d5c9d97-s5cmj - INFO - REBALANCO - partições ATRIBUÍDAS a consumidor-748d5c9d97-s5cmj: [0, 1, 2] | partições atuais: [0, 1, 2]
+[pod/consumidor-748d5c9d97-s5cmj/consumidor] 2026-09-25 23:42:13,261 - consumidor-748d5c9d97-s5cmj - WARNING - REBALANCO - partições REVOGADAS de consumidor-748d5c9d97-s5cmj: [0, 1] | partições atuais: [2]
+[pod/consumidor-748d5c9d97-s5cmj/consumidor] 2026-09-25 23:44:04,765 - consumidor-748d5c9d97-s5cmj - INFO - REBALANCO - partições ATRIBUÍDAS a consumidor-748d5c9d97-s5cmj: [0, 1] | partições atuais: [0, 1, 2]
+
+--- make grupo ---
+kubectl exec -n fabrinteligente kafka-1-0 -- /opt/kafka/bin/kafka-consumer-groups.sh \
+	--bootstrap-server kafka-1-0.kafka-headless:9092 --describe --group processadores \
+	--timeout 30000
+
+GROUP           TOPIC           PARTITION  CURRENT-OFFSET  LOG-END-OFFSET  LAG             CONSUMER-ID                                                      HOST            CLIENT-ID
+processadores   dados-sensores  1          2030            2034            4               consumidor-748d5c9d97-s5cmj-237f672f-e012-474d-87c7-b5d61824eb0d /10.244.0.212   consumidor-748d5c9d97-s5cmj
+processadores   dados-sensores  0          2030            2034            4               consumidor-748d5c9d97-s5cmj-237f672f-e012-474d-87c7-b5d61824eb0d /10.244.0.212   consumidor-748d5c9d97-s5cmj
+processadores   dados-sensores  2          2029            2034            5               consumidor-748d5c9d97-s5cmj-237f672f-e012-474d-87c7-b5d61824eb0d /10.244.0.212   consumidor-748d5c9d97-s5cmj
