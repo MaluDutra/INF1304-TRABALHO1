@@ -31,6 +31,7 @@ ignore = [
     "D107",   # Args fica na docstring da classe, não no __init__
     "D203",   # conflita com D211
     "D213",   # conflita com D212
+    "S311",   # random é usado só para simular leituras, não para fins criptográficos
 ]
 
 [lint.pydocstyle]

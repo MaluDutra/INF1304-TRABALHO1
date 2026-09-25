@@ -1,5 +1,4 @@
-"""
-sensor.py
+"""sensor.py.
 
 Simula um sensor de uma máquina da fábrica inteligente.
 Gera periodicamente uma leitura (temperatura, vibração, consumo de
@@ -9,10 +8,10 @@ energia e umidade) e publica no tópico Kafka configurado, como produtor.
 import json
 import os
 import random
-import time
 import socket
+import time
 
-from confluent_kafka import Producer, KafkaException
+from confluent_kafka import KafkaError, KafkaException, Message, Producer
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -38,16 +37,16 @@ FAIXAS = {
 
 
 def gerar_leitura(sensor_id: str) -> dict:
-    """
-    Gera uma leitura simulada de um sensor da fábrica.
+    """Gera uma leitura simulada de um sensor da fábrica.
 
-    Cada grandeza é sorteada dentro da faixa configurada,
-    de modo que valores acima dos limites de alerta
-    ocorram com alguma frequência.
+    Cada grandeza é sorteada dentro da faixa configurada, de modo que valores
+    acima dos limites de alerta ocorram com alguma frequência.
 
-    :param sensor_id: identificador do sensor que gerou a leitura.
-    :return: dicionário com as grandezas medidas, o setor e o
-             instante da medição.
+    Args:
+        sensor_id: Identificador do sensor que gerou a leitura.
+
+    Returns:
+        Dicionário com as grandezas medidas, o setor e o instante da medição.
     """
     leitura = {
         "sensor_id": sensor_id,
@@ -61,13 +60,15 @@ def gerar_leitura(sensor_id: str) -> dict:
     return leitura
 
 
-def callback_entrega(erro, msg):
-    """
-    Callback chamado pelo cliente Kafka de forma assíncrona,
-    informando se a mensagem foi confirmada pelo broker ou falhou.
+def callback_entrega(erro: KafkaError | None, msg: Message) -> None:
+    """Callback de entrega de mensagens do Kafka.
 
-    :param erro: objeto de erro do Kafka, ou None se deu certo.
-    :param msg: a mensagem original que foi enviada.
+    Callback chamado pelo cliente Kafka de forma assíncrona, informando se
+    a mensagem foi confirmada pelo broker ou falhou.
+
+    Args:
+        erro: Objeto de erro do Kafka, ou None se deu certo.
+        msg: A mensagem original que foi enviada.
     """
     if erro is not None:
         print(f"[ERRO] Falha ao entregar mensagem: {erro}")
@@ -75,10 +76,11 @@ def callback_entrega(erro, msg):
         print(f"[OK] {msg.topic()} partição={msg.partition()} offset={msg.offset()}")
 
 
-def main():
-    """
-    Loop principal do produtor: cria o cliente Kafka e envia
-    leituras simuladas continuamente até ser interrompido.
+def main() -> None:
+    """Script principal do sensor.
+
+    Loop principal do produtor: cria o cliente Kafka e envia leituras
+    simuladas continuamente até ser interrompido.
     """
     produtor = Producer(
         {
@@ -111,7 +113,7 @@ def main():
 
             produtor.poll(0)
             print(f"[{SENSOR_ID}] enviado: {leitura}")
-            time.sleep(INTERVALO)      
+            time.sleep(INTERVALO)
 
     except KeyboardInterrupt:
         print(f"[{SENSOR_ID}] encerrando...")
