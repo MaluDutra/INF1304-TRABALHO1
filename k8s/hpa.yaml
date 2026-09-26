@@ -25,4 +25,7 @@ spec:
         name: cpu
         target:
           type: Utilization
-          averageUtilization: 50 # Limite de uso de CPU para disparar o aumento de réplicas
+          # Percentual sobre requests.cpu (100m). O valor vem do .env e foi medido neste
+          # cluster: 6 sensores levam o consumidor a ~4m e 60 sensores a ~18m, então 8%
+          # (8m) só dispara quando o número de produtores aumenta
+          averageUtilization: ${HPA_CPU_ALVO}

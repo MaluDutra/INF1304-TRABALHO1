@@ -1,0 +1,40 @@
+==========================================================
+ ELASTICIDADE POR NUMERO DE PRODUTORES - Fri Sep 25 22:44:16 -03 2026
+ Intervalo padrao (2s), alvo do HPA = 8% de CPU
+ 6 sensores -> 60 sensores (make escalar-sensores N=10) -> 6 sensores
+==========================================================
+
+22:44:16  sensores=6  cpu: 4%/8% replicas=1
+22:44:16  make escalar-sensores N=10
+22:44:31  sensores=60  cpu: 5%/8% replicas=1
+22:44:45  sensores=60  cpu: 4%/8% replicas=1
+22:45:00  sensores=60  cpu: 4%/8% replicas=1
+22:45:14  sensores=60  cpu: 22%/8% replicas=3
+22:45:30  sensores=60  cpu: 22%/8% replicas=3
+22:45:43  sensores=60  cpu: 8%/8% replicas=3
+22:45:59  sensores=60  cpu: 8%/8% replicas=3
+22:46:13  sensores=60  cpu: 8%/8% replicas=3
+22:46:28  sensores=60  cpu: 9%/8% replicas=3
+22:46:42  sensores=60  cpu: 8%/8% replicas=3
+22:46:56  sensores=60  cpu: 8%/8% replicas=3
+22:47:12  sensores=60  cpu: 8%/8% replicas=3
+
+--- make grupo (60 sensores) ---
+GROUP           TOPIC           PARTITION  CURRENT-OFFSET  LOG-END-OFFSET  LAG             CONSUMER-ID                                                      HOST            CLIENT-ID
+processadores   dados-sensores  0          55292           55305           13              consumidor-648bb84c65-nk4tw-198f62aa-dc2d-4497-87cf-16369df664d5 /10.42.0.215    consumidor-648bb84c65-nk4tw
+processadores   dados-sensores  2          55260           55277           17              consumidor-648bb84c65-mhdh5-cf2b858a-7ba9-4bd7-bdad-e4c975383890 /10.42.0.212    consumidor-648bb84c65-mhdh5
+processadores   dados-sensores  1          55307           55316           9               consumidor-648bb84c65-cnn6g-03b649e8-db6a-4351-9caa-17409ac2c56e /10.42.0.216    consumidor-648bb84c65-cnn6g
+
+22:47:21  make escalar-sensores N=1
+22:47:34  sensores=60  cpu: 9%/8% replicas=3
+22:47:50  sensores=60  cpu: 8%/8% replicas=3
+22:48:04  sensores=6  cpu: 8%/8% replicas=3
+22:48:20  sensores=6  cpu: 3%/8% replicas=3
+22:48:33  sensores=6  cpu: 2%/8% replicas=3
+22:48:49  sensores=6  cpu: 2%/8% replicas=3
+22:49:02  sensores=6  cpu: 2%/8% replicas=3
+22:49:18  sensores=6  cpu: 2%/8% replicas=2
+22:49:31  sensores=6  cpu: 2%/8% replicas=1
+22:49:47  sensores=6  cpu: 4%/8% replicas=1
+22:50:00  sensores=6  cpu: 3%/8% replicas=1
+22:50:15  sensores=6  cpu: 4%/8% replicas=1

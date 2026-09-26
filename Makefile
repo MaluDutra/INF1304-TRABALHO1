@@ -17,11 +17,17 @@ DIR_DADOS       ?= /dados
 ARQUIVO_DADOS   ?= dados-processados.jsonl
 ARQUIVO_ALERTAS ?= alertas.jsonl
 # Qualquer réplica serve: todas montam o mesmo volume
-POD_CONSUMIDOR  := kubectl get pod -l app=consumidor -n $(NS) -o jsonpath='{.items[0].metadata.name}'
+# Os arquivos só são acessíveis por dentro de um consumidor, que é quem monta o volume.
+# Sem nenhum rodando, o alvo para com uma mensagem clara em vez do erro do jsonpath.
+POD_CONSUMIDOR  := pod=$$(kubectl get pod -l app=consumidor -n $(NS) \
+                   --field-selector=status.phase=Running \
+                   -o jsonpath='{.items[0].metadata.name}' 2>/dev/null); \
+                   [ -n "$$pod" ] || { echo "Nenhum consumidor rodando: suba um com 'make escalar N=1'"; exit 1; }
 # Apenas estas variáveis são substituídas nos manifestos; as demais
 # (usadas dentro dos containers) precisam chegar intactas.
 SUBST_VARS  := '$$DOCKER_USER $$TAG_SENSOR $$TAG_CONSUMIDOR $$KAFKA_CLUSTER_ID \
-                $$KAFKA_IMAGEM $$PARTICOES $$REPLICACAO $$MIN_ISR $$MAX_CONSUMIDORES'
+                $$KAFKA_IMAGEM $$PARTICOES $$REPLICACAO $$MIN_ISR $$MAX_CONSUMIDORES \
+                $$HPA_CPU_ALVO'
 
 TIMEOUT_CLI_MS  ?= 30000
 
@@ -34,13 +40,20 @@ help: ## Mostra esta ajuda
 # ---------- Possíveis ajustes necessários ----------
 
 configmap: ## Regenera o ConfigMap a partir do .env
-	@grep -vE '^(#|$$|DOCKER_USER=|TAG_|KAFKA_CLUSTER_ID=|KAFKA_IMAGEM=|MIN_ISR=|MAX_CONSUMIDORES=|TIMEOUT_CLI_MS=)' .env \
+	@grep -vE '^(#|$$|DOCKER_USER=|TAG_|KAFKA_CLUSTER_ID=|KAFKA_IMAGEM=|MIN_ISR=|MAX_CONSUMIDORES=|HPA_CPU_ALVO=|TIMEOUT_CLI_MS=)' .env \
 	 | sed 's/\r$$//' > /tmp/fabrica.env
 	kubectl create configmap fabrica-config --from-env-file=/tmp/fabrica.env \
 		-n $(NS) --dry-run=client -o yaml > k8s/configmap.yaml
+	kubectl apply -f k8s/namespace.yaml
 	kubectl apply -f k8s/configmap.yaml
-	kubectl rollout restart deployment -l app=sensor -n $(NS)
-	kubectl rollout restart deployment consumidor -n $(NS)
+	@# Na primeira instalação ainda não há pods para reiniciar: o make up já sobe
+	@# tudo lendo o ConfigMap novo
+	@if kubectl get deployment consumidor -n $(NS) >/dev/null 2>&1; then \
+		kubectl rollout restart deployment -l app=sensor -n $(NS); \
+		kubectl rollout restart deployment consumidor -n $(NS); \
+	else \
+		echo "Sistema ainda não está no ar: o ConfigMap será usado no próximo make up"; \
+	fi
 
 # ---------- Imagens ----------
 
@@ -104,6 +117,17 @@ recriar-topico: ## Apaga e recria o tópico (zera os dados)
 	kubectl delete job criar-topico -n $(NS) --ignore-not-found
 	kubectl apply -f $(RENDER_DIR)/criar-topico.yaml
 
+# O Kafka só aceita mudar os offsets de um grupo sem membros ativos: por isso os
+# consumidores são parados antes e religados depois. Com zero réplicas o HPA fica
+# suspenso, e volta a atuar quando o Deployment é escalado para 1 de novo.
+resetar-offsets: ## Pula as mensagens acumuladas: leva o grupo para o fim do tópico
+	kubectl scale deployment consumidor --replicas=0 -n $(NS)
+	-kubectl wait --for=delete pod -l app=consumidor -n $(NS) --timeout=120s
+	kubectl exec -n $(NS) $(BROKER) -- /opt/kafka/bin/kafka-consumer-groups.sh \
+		--bootstrap-server $(BOOTSTRAP) --group $(GRUPO) --topic $(TOPICO) \
+		--reset-offsets --to-latest --execute --timeout $(TIMEOUT_CLI_MS)
+	kubectl scale deployment consumidor --replicas=1 -n $(NS)
+
 # ---------- Observação ----------
 
 status: ## Visão geral: pods, HPA e uso de recursos
@@ -151,13 +175,13 @@ export VALIDAR_PY
 
 dados: ## Copia os dados processados e os alertas do volume para ./dados/
 	@mkdir -p dados
-	@pod=$$($(POD_CONSUMIDOR)); \
+	@$(POD_CONSUMIDOR); \
 	 kubectl exec -n $(NS) $$pod -- cat $(DIR_DADOS)/$(ARQUIVO_DADOS)   > dados/$(ARQUIVO_DADOS); \
 	 kubectl exec -n $(NS) $$pod -- cat $(DIR_DADOS)/$(ARQUIVO_ALERTAS) > dados/$(ARQUIVO_ALERTAS)
 	@wc -l dados/$(ARQUIVO_DADOS) dados/$(ARQUIVO_ALERTAS)
 
 alertas: ## Mostra os últimos alertas gravados, sem copiar nada
-	@pod=$$($(POD_CONSUMIDOR)); \
+	@$(POD_CONSUMIDOR); \
 	 kubectl exec -n $(NS) $$pod -- tail -n 20 $(DIR_DADOS)/$(ARQUIVO_ALERTAS)
 
 validar-dados: ## Verifica que toda linha é um JSON válido (prova do append atômico)
@@ -183,7 +207,7 @@ dashboard: ## Gera o dashboard HTML a partir dos dados ja coletados
 	python3 dashboard/gerar_dashboard.py
 
 limpar-dados: ## Esvazia os arquivos no volume para começar um teste limpo
-	@pod=$$($(POD_CONSUMIDOR)); \
+	@$(POD_CONSUMIDOR); \
 	 kubectl exec -n $(NS) $$pod -- sh -c \
 	   ': > $(DIR_DADOS)/$(ARQUIVO_DADOS); : > $(DIR_DADOS)/$(ARQUIVO_ALERTAS)'
 	@echo "Arquivos de dados e de alertas esvaziados"
@@ -203,6 +227,17 @@ carga-normal: ## Volta os sensores ao intervalo padrão
 escalar: ## Define o número de consumidores. Uso: make escalar N=3
 	kubectl scale deployment consumidor --replicas=$(N) -n $(NS)
 
+# Alternativa ao carga-alta: em vez de acelerar os sensores, aumenta o número de
+# produtores. Escalando TODAS as máquinas, as chaves continuam sendo as 6 de sempre
+# e a carga extra se espalha igualmente pelas 3 partições.
+escalar-sensores: ## Réplicas de todas as máquinas. Uso: make escalar-sensores N=10
+	kubectl scale deployment -l app=sensor --replicas=$(N) -n $(NS)
+
+# Réplicas de UMA máquina compartilham o SENSOR_ID, que é a chave da mensagem:
+# todas caem na mesma partição, e só um consumidor recebe a carga extra.
+escalar-maquina: ## Réplicas de uma máquina só. Uso: make escalar-maquina MAQUINA=trn N=10
+	kubectl scale deployment sensor-$(MAQUINA) --replicas=$(N) -n $(NS)
+
 watch-hpa: ## Acompanha o HPA escalando os consumidores em tempo real
 	watch -n 2 'kubectl get hpa,pods -n $(NS) -l app=consumidor'
 
@@ -214,7 +249,7 @@ falha-broker: ## Simula a queda de um broker e grava as evidências
 falha-consumidor: ## Simula a queda de um consumidor e grava as evidências
 	./scripts/falha-consumidor.sh
 
-.PHONY: help build push publicar render metrics-server up down topico offsets recriar-topico \
+.PHONY: help build push publicar render metrics-server up down topico offsets recriar-topico resetar-offsets \
         status grupo logs-sensores logs-consumidor rebalanceamento dados alertas \
         validar-dados dados-resumo dashboard limpar-dados carga-alta carga-normal escalar \
-        watch-hpa falha-broker falha-consumidor
+        watch-hpa escalar-sensores escalar-maquina falha-broker falha-consumidor
